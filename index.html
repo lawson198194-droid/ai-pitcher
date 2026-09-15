@@ -7,8 +7,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#05080f">
-<meta name="description" content="AI BASEBALL · 青少年棒球投球与打击动作分析（端侧姿态估计原型）">
-<title>AI BASEBALL · 青少年棒球动作分析</title>
+<meta name="description" content="AI BASEBALL · 青少年棒球投球 / 打击 / 垒球投球 动作分析（端侧姿态估计原型）">
+<title>AI BASEBALL · 青少年棒球 / 垒球动作分析</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -41,12 +41,12 @@
   }
   .tab{
     flex:1;min-width:0;border:none;background:transparent;color:#93a8ca;
-    font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.2px;
-    padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;
-    display:flex;align-items:center;justify-content:center;gap:5px;
+    font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:0;
+    padding:8px 3px;border-radius:8px;cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;justify-content:center;gap:3.5px;
     transition:background .18s ease,color .18s ease,box-shadow .18s ease;
   }
-  .tab svg{flex:none;opacity:.9}
+  .tab svg{flex:none;opacity:.9;width:12px;height:12px}
   .tab:active{transform:scale(.98)}
   .tab.on{
     background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#fff;
@@ -61,7 +61,8 @@
   }
   .ver:active{transform:scale(.96)}
   .ver.stale{color:#fbbf24;border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.09)}
-  @media(max-width:400px){ .brand{display:none} }
+  @media(max-width:480px){ .brand{display:none} }
+  @media(max-width:360px){ .tab{font-size:10.5px;gap:2px} .ver{padding:5px 5px} }
 
   /* ---------- 内容区 ---------- */
   #stage{flex:1;position:relative;min-height:0;background:#05080f}
@@ -105,16 +106,22 @@
     <div class="brand"><span class="dot"></span>AI BASEBALL</div>
     <div class="seg" id="seg">
       <button class="tab on" data-mode="pitch" type="button">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="9"/><path d="M4.5 5.5c3 3 3.6 9.4 1.2 13M19.5 5.5c-3 3-3.6 9.4-1.2 13"/>
         </svg>
-        投球分析
+        棒球投球
       </button>
       <button class="tab" data-mode="hit" type="button">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14.5 3.5 20 9M17.5 6.5 8 16l-3.5 7L11 19.5 20.5 10z"/>
         </svg>
         打击分析
+      </button>
+      <button class="tab" data-mode="soft" type="button">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M5 6c2.6 3.4 2.6 8.6 0 12M19 6c-2.6 3.4-2.6 8.6 0 12"/>
+        </svg>
+        垒球分析
       </button>
     </div>
     <span class="ver" id="ver" title="点击强制刷新到最新版本">v—</span>
@@ -123,14 +130,15 @@
 
 <div id="stage">
   <div id="load"><div class="spin"></div><div class="lt">正在载入分析引擎…</div></div>
-  <div id="hint">切换上方标签可查看另一种动作模式 · 已上传的视频不会丢失</div>
+  <div id="hint">切换上方标签可查看其他动作模式 · 已上传的视频不会丢失</div>
 </div>
 
 <script>
 /* =====================================================================
-   AI BASEBALL · 双模式外壳
-   投球 / 打击两个原型各自独立运行在 iframe 内——CSS 与 JS 完全隔离，
-   互不污染；两个 iframe 并存，切换时状态（已上传视频、已截关键帧）保留。
+   AI BASEBALL · 三模式外壳
+   棒球投球 / 打击 / 垒球投球 三个原型各自独立运行在 iframe 内——
+   CSS 与 JS 完全隔离，互不污染；iframe 并存，切换时状态（已上传视频、
+   已截关键帧）保留。
 
    版本机制：
    - BUILD 是本文件的版本号，由发布脚本写入；页面顶栏直接显示。
@@ -139,12 +147,13 @@
        · 一致   → 已是最新，正常放行
    - iframe 也带版本参数，版本一变 URL 就变，同样不可能拿到旧的子页面。
    ===================================================================== */
-const BUILD = '1.0.0';          // ← 由发布脚本自动写入，勿手改
+const BUILD = '1.0.1';          // ← 由发布脚本自动写入，勿手改
 const GUARD_KEY = 'aiball_reload_guard';
 
 const META = {
-  pitch: { file: 'pitch.html', label: '投球分析' },
-  hit:   { file: 'hit.html',   label: '打击分析' }
+  pitch: { file: 'pitch.html', label: '棒球投球' },
+  hit:   { file: 'hit.html',   label: '打击分析' },
+  soft:  { file: 'soft.html',  label: '垒球投球' }
 };
 
 const stage  = document.getElementById('stage');
@@ -253,7 +262,7 @@ function show(mode, writeHash){
     catch(e){ location.hash = mode; }
   }
 
-  if(hintEl && mode === 'hit') hintEl.classList.add('off');
+  if(hintEl && mode !== 'pitch') hintEl.classList.add('off');
 }
 
 tabs.forEach(function(b){
