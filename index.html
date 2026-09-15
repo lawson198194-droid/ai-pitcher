@@ -3,1691 +3,205 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#080d18">
-<title>AI PITCHER · 青少年投手动作分析</title>
+<meta name="theme-color" content="#05080f">
+<meta name="description" content="AI BASEBALL · 青少年棒球投球与打击动作分析（端侧姿态估计原型）">
+<title>AI BASEBALL · 青少年棒球动作分析</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  :root{
-    --bg:#080d18; --panel:#111a2c; --panel2:#0c1424; --line:#1f2c45; --line2:#2b3d5c;
-    --tx:#e9f0ff; --tx2:#93a8ca; --tx3:#5f7398;
-    --blue:#3b82f6; --cyan:#22d3ee; --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --purple:#a855f7;
-  }
   html,body{height:100%}
   body{
-    background:#05080f; color:var(--tx);
+    background:#05080f;color:#e9f0ff;overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    display:flex;flex-direction:column;
   }
-  /* ---------- phone shell ---------- */
-  #phone{
-    position:relative; width:100%; max-width:430px; height:100dvh; max-height:932px;
-    background:var(--bg); overflow:hidden; display:flex; flex-direction:column;
+
+  /* ---------- 顶部模式切换栏 ---------- */
+  #bar{
+    flex:none;position:relative;z-index:20;
+    background:linear-gradient(180deg,#0d1729,#0a1120);
+    border-bottom:1px solid #1f2c45;
+    padding:calc(7px + env(safe-area-inset-top,0px)) 12px 7px;
   }
-  @media(min-width:520px) and (min-height:820px){
-    body{background:radial-gradient(1200px 700px at 50% 0%,#101c33 0%,#05080f 70%)}
-    #phone{border-radius:42px; border:1px solid #24334f; box-shadow:0 40px 90px rgba(0,0,0,.75),0 0 0 9px #0b1220}
+  .wrap{max-width:430px;margin:0 auto;display:flex;align-items:center;gap:9px}
+  .brand{
+    display:flex;align-items:center;gap:6px;flex:none;
+    font-size:11px;font-weight:800;letter-spacing:.6px;color:#6b81a5;white-space:nowrap;
   }
-  .screen{position:absolute;inset:0;display:none;flex-direction:column}
-  .screen.on{display:flex}
-  .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-  .scroll::-webkit-scrollbar{width:0}
-
-  /* ---------- topbar ---------- */
-  .topbar{
-    display:flex;align-items:center;gap:10px;padding:14px 16px 10px;
-    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0d1729,#0a1120);
-    position:relative;z-index:5;flex:none;
+  .brand .dot{
+    width:7px;height:7px;border-radius:99px;flex:none;
+    background:linear-gradient(135deg,#22d3ee,#3b82f6);
+    box-shadow:0 0 8px rgba(34,211,238,.65);
   }
-  .back{width:32px;height:32px;border-radius:10px;border:1px solid var(--line2);background:#111c30;
-    display:flex;align-items:center;justify-content:center;color:var(--tx2);cursor:pointer;flex:none}
-  .back:active{transform:scale(.94)}
-  .ttl{font-size:15px;font-weight:700;letter-spacing:.2px;line-height:1.2}
-  .sub{display:block;font-size:10.5px;color:var(--tx3);margin-top:2px;font-weight:400;letter-spacing:0}
-  .dots{margin-left:auto;display:flex;gap:5px}
-  .dots i{width:6px;height:6px;border-radius:99px;background:#243550;display:block}
-  .dots i.on{background:var(--blue);width:16px}
-
-  /* ---------- atoms ---------- */
-  .pad{padding:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
-  .grp{margin-bottom:18px}
-  .grp-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-  .grp-h .n{width:20px;height:20px;border-radius:7px;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);
-    color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
-  .grp-h .t{font-size:12.5px;font-weight:700;color:#cfe0fb;letter-spacing:.3px}
-  .grp-h .line{flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
-  .btn{
-    width:100%;border:none;border-radius:13px;padding:14px;font-size:14.5px;font-weight:700;color:#fff;
-    background:linear-gradient(135deg,#2563eb,#0ea5e9);cursor:pointer;display:flex;align-items:center;
-    justify-content:center;gap:8px;letter-spacing:.4px;font-family:inherit;transition:.15s;
+  .seg{
+    display:flex;gap:3px;background:#0b1424;border:1px solid #1f2c45;
+    border-radius:11px;padding:3px;flex:1;min-width:0;
   }
-  .btn:active{transform:scale(.985);filter:brightness(1.08)}
-  .btn.ghost{background:#16223a;border:1px solid var(--line2);color:#b9cbe8}
-  .btn[disabled]{opacity:.36;pointer-events:none;filter:grayscale(.5)}
-  .row{display:flex;align-items:center;gap:10px}
-  .pill{font-size:10px;padding:3px 8px;border-radius:99px;border:1px solid;font-weight:700;white-space:nowrap}
-  .p-ok{color:#5ee9a0;border-color:rgba(34,197,94,.42);background:rgba(34,197,94,.1)}
-  .p-warn{color:#fbbf24;border-color:rgba(245,158,11,.42);background:rgba(245,158,11,.1)}
-  .p-bad{color:#fca5a5;border-color:rgba(239,68,68,.42);background:rgba(239,68,68,.1)}
-  .p-info{color:#7dd3fc;border-color:rgba(56,189,248,.42);background:rgba(56,189,248,.1)}
-  .p-gray{color:#8fa3c4;border-color:#2b3d5c;background:#16223a}
-  .hint{font-size:10.5px;color:var(--tx3);line-height:1.55}
-  b.k{color:#8ec5ff;font-weight:700}
+  .tab{
+    flex:1;min-width:0;border:none;background:transparent;color:#93a8ca;
+    font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.2px;
+    padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;justify-content:center;gap:5px;
+    transition:background .18s ease,color .18s ease,box-shadow .18s ease;
+  }
+  .tab svg{flex:none;opacity:.9}
+  .tab:active{transform:scale(.98)}
+  .tab.on{
+    background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#fff;
+    box-shadow:0 2px 10px rgba(29,78,216,.4);
+  }
+  @media(max-width:400px){ .brand{display:none} }
 
-  /* ---------- guide ---------- */
-  .hero{padding:18px 16px 6px}
-  .hero h1{font-size:22px;font-weight:800;line-height:1.25;letter-spacing:.2px;
-    background:linear-gradient(100deg,#e9f0ff,#7dd3fc 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .hero p{font-size:11.5px;color:var(--tx2);margin-top:7px;line-height:1.65}
-  .rule{display:flex;gap:10px;padding:11px 12px;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;margin-bottom:8px;cursor:pointer;transition:.15s;position:relative}
-  .rule:active{background:#16233a}
-  .rule.done{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.06)}
-  .rule .box{width:19px;height:19px;border-radius:6px;border:1.6px solid var(--line2);flex:none;margin-top:1px;
-    display:flex;align-items:center;justify-content:center;transition:.15s;background:#0b1424}
-  .rule.done .box{background:var(--green);border-color:var(--green)}
-  .rule .box svg{opacity:0;transition:.15s}
-  .rule.done .box svg{opacity:1}
-  .rule .body{flex:1;min-width:0}
-  .rule .rt{font-size:12.5px;font-weight:700;color:#d7e5fb;line-height:1.4}
-  .rule .rd{font-size:10.5px;color:var(--tx2);line-height:1.6;margin-top:3px}
-  .rule .rd b{color:#fbbf24;font-weight:700}
-  .rule .rd i{color:#7dd3fc;font-style:normal;font-weight:600}
-  .crit{position:absolute;right:10px;top:10px}
-  .prog{height:5px;background:#16223a;border-radius:99px;overflow:hidden;margin:10px 0 14px}
-  .prog i{display:block;height:100%;width:0;border-radius:99px;
-    background:linear-gradient(90deg,#22d3ee,#22c55e);transition:width .3s}
+  /* ---------- 内容区 ---------- */
+  #stage{flex:1;position:relative;min-height:0;background:#05080f}
+  .frame{
+    position:absolute;inset:0;width:100%;height:100%;border:0;
+    display:none;background:#05080f;
+  }
+  .frame.on{display:block}
 
-  /* ---------- diagram ---------- */
-  .dia{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
-  .dia svg{width:100%;display:block}
-  .dia .cap{font-size:10.5px;color:var(--tx3);text-align:center;margin-top:6px}
+  /* ---------- 载入遮罩 ---------- */
+  #load{
+    position:absolute;inset:0;z-index:10;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    background:#05080f;opacity:1;transition:opacity .28s ease;
+  }
+  #load.off{opacity:0}
+  .spin{
+    width:26px;height:26px;border-radius:50%;
+    border:2.5px solid #1f2c45;border-top-color:#3b82f6;
+    animation:sp .8s linear infinite;
+  }
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .lt{font-size:11.5px;color:#5f7398;letter-spacing:.4px}
 
-  /* ---------- capture ---------- */
-  .drop{border:1.6px dashed #2f4767;border-radius:16px;background:linear-gradient(180deg,#0e1a2d,#0b1424);
-    padding:30px 18px;text-align:center;cursor:pointer;transition:.18s}
-  .drop:active{border-color:var(--blue);background:#12213a}
-  .drop .ico{width:54px;height:54px;border-radius:16px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,#1d4ed8,#0891b2);box-shadow:0 10px 24px rgba(37,99,235,.32)}
-  .kv{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #1c2942;font-size:11.5px}
-  .kv:last-child{border-bottom:none}
-  .kv span:first-child{color:var(--tx2)}
-  .kv span:last-child{color:#dbeafe;font-weight:700;font-variant-numeric:tabular-nums}
-  .chk{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:11px;background:var(--panel2);
-    border:1px solid var(--line);margin-bottom:7px;font-size:11.5px}
-  .chk .st{width:17px;height:17px;border-radius:99px;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
-  .st.ok{background:rgba(34,197,94,.16);color:#5ee9a0;border:1px solid rgba(34,197,94,.45)}
-  .st.warn{background:rgba(245,158,11,.16);color:#fbbf24;border:1px solid rgba(245,158,11,.45)}
-  .st.bad{background:rgba(239,68,68,.16);color:#fca5a5;border:1px solid rgba(239,68,68,.45)}
-  .chk .v{margin-left:auto;font-variant-numeric:tabular-nums;color:#9fb4d6;font-size:11px}
-
-  /* ---------- analyzing ---------- */
-  .an-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px}
-  .spinner{width:88px;height:88px;border-radius:99px;border:3px solid #1b2a44;border-top-color:var(--cyan);
-    border-right-color:var(--blue);animation:spin .9s linear infinite;margin-bottom:22px;position:relative}
-  .spinner::after{content:"";position:absolute;inset:14px;border-radius:99px;border:2px solid transparent;
-    border-bottom-color:#a855f7;animation:spin 1.4s linear infinite reverse}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .steps{width:100%;max-width:300px;margin-top:20px}
-  .step{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--tx3);padding:5px 0;transition:.2s}
-  .step .d{width:6px;height:6px;border-radius:99px;background:#243550;flex:none;transition:.2s}
-  .step.act{color:#bfe0ff}
-  .step.act .d{background:var(--cyan);box-shadow:0 0 0 4px rgba(34,211,238,.14)}
-  .step.done{color:#7b93b8}
-  .step.done .d{background:var(--green)}
-
-  /* ---------- result ---------- */
-  .stage{position:relative;width:100%;background:#05080f;overflow:hidden}
-  .stage img{display:block;width:100%;height:100%;object-fit:fill}
-  .stage svg{position:absolute;inset:0;width:100%;height:100%}
-  .tag{position:absolute;top:10px;left:10px;background:rgba(4,8,16,.78);backdrop-filter:blur(10px);
-    border:1px solid rgba(80,120,180,.35);border-radius:10px;padding:6px 10px;pointer-events:none}
-  .tag .c{font-size:9.5px;font-weight:800;color:#7dd3fc;letter-spacing:1.2px}
-  .tag .n{font-size:11.5px;font-weight:700;margin-top:1px;color:#e9f0ff}
-  .alert{position:absolute;top:10px;right:10px;display:none;align-items:center;gap:5px;
-    background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#fca5a5;
-    border-radius:10px;padding:6px 9px;font-size:10px;font-weight:700;backdrop-filter:blur(8px);max-width:60%}
-  .alert.on{display:flex}
-  .meta{position:absolute;bottom:7px;right:10px;font-size:9px;color:#5f7398;pointer-events:none}
-  .thumbs{display:flex;gap:8px;overflow-x:auto;padding:12px 16px 4px;scrollbar-width:none}
-  .thumbs::-webkit-scrollbar{display:none}
-  .th{flex:none;width:74px;cursor:pointer}
-  .th .im{width:74px;height:44px;border-radius:9px;overflow:hidden;border:1.5px solid var(--line);
-    background:#0b1424;position:relative;transition:.15s}
-  .th.on .im{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
-  .th .im img{width:100%;height:100%;object-fit:cover;opacity:.82}
-  .th .lb{font-size:9px;color:var(--tx3);margin-top:4px;text-align:center;line-height:1.3}
-  .th.on .lb{color:#bfe0ff;font-weight:700}
-  .th .st{position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:99px}
-  .scrub{padding:2px 16px 12px}
-  input[type=range]{width:100%;-webkit-appearance:none;height:22px;background:transparent}
-  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:99px;background:#1e2c46}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:99px;
-    background:#3b82f6;margin-top:-6px;box-shadow:0 0 0 4px rgba(59,130,246,.16)}
-  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
-  .mt{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px}
-  .mt .l{font-size:9.5px;color:var(--tx3);line-height:1.35}
-  .mt .v{font-size:16px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
-  .mt .g{font-size:9px;color:#6b81a5;margin-top:2px}
-  .fb{margin-bottom:9px}
-  .fb .fh{font-size:10.5px;font-weight:700;color:#c9dbf6;display:flex;align-items:center;gap:6px;margin-bottom:5px}
-  .fb .ft{font-size:11px;color:var(--tx2);line-height:1.72;background:var(--panel2);
-    border:1px solid var(--line);border-radius:10px;padding:10px 11px}
-  .fb.risk .ft{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.055)}
-
-  /* ---------- report ---------- */
-  .score-hero{display:flex;align-items:center;gap:16px;padding:18px}
-  .ring{position:relative;width:96px;height:96px;flex:none}
-  .ring svg{transform:rotate(-90deg)}
-  .ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .ring .n{font-size:27px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-  .ring .u{font-size:9px;color:var(--tx3);margin-top:2px}
-  .rp{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #16223a;font-size:11.5px}
-  .rp:last-child{border-bottom:none}
-  .rp .dot{width:20px;height:20px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;
-    font-size:10px;font-weight:800}
-  .rp .nm{flex:1;min-width:0;color:#d3e2f8;font-weight:600;line-height:1.35}
-  .rp .nm small{display:block;font-size:9.5px;color:var(--tx3);font-weight:400;margin-top:2px}
-  .tbl{width:100%;border-collapse:collapse;font-size:10.5px}
-  .tbl th{color:var(--tx3);font-weight:600;text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
-  .tbl td{padding:7px 4px;border-bottom:1px solid #16223a;color:#cfdcf2;font-variant-numeric:tabular-nums}
-  .tbl tr:last-child td{border-bottom:none}
-  .foot{padding:12px 16px 20px;flex:none}
-  .disc{font-size:9.5px;color:#55698c;line-height:1.6;text-align:center;padding:0 6px 8px}
-  .note{display:flex;gap:8px;padding:10px 11px;border-radius:11px;background:rgba(56,189,248,.07);
-    border:1px solid rgba(56,189,248,.22);font-size:10px;color:#9dc4e8;line-height:1.6}
-  .rule.opt{border-style:dashed}
-
-  /* ---------- 双视角 ---------- */
-  .slots{display:flex;flex-direction:column;gap:10px}
-  .slot{border:1.5px dashed #2f4767;border-radius:14px;padding:14px;background:#0c1424;cursor:pointer;
-    position:relative;transition:.15s}
-  .slot:active{background:#12213a}
-  .slot.done{border-style:solid;border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.05)}
-  .slot.on{border-style:solid;border-color:var(--blue);background:rgba(59,130,246,.09)}
-  .slot .sl{font-size:12px;font-weight:700;color:#cfe0fb;display:flex;align-items:center;gap:7px;padding-right:74px}
-  .slot .sd{font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.55}
-  .slot .sd b{color:#8ec5ff}
-  .slot .thumb{position:absolute;right:11px;top:11px;width:60px;height:34px;border-radius:7px;
-    object-fit:cover;border:1px solid var(--line2);display:none}
-  .slot.done .thumb{display:block}
-  .slot .rm{position:absolute;right:9px;bottom:8px;font-size:9px;color:#93a8ca;border:1px solid var(--line2);
-    border-radius:6px;padding:2px 7px;background:#111c30;display:none}
-  .slot.done .rm{display:block}
-  .slot .rm:active{color:#fca5a5;border-color:rgba(239,68,68,.5)}
-  .vtabs{display:flex;gap:8px;padding:10px 16px 0;flex:none}
-  .vt{flex:1;border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:8px 10px;
-    cursor:pointer;transition:.15s}
-  .vt.on{border-color:var(--blue);background:rgba(59,130,246,.13)}
-  .vt.lock{opacity:.5;cursor:default}
-  .vt .n{font-size:11px;font-weight:700;color:#c9dbf6;display:flex;align-items:center;gap:5px}
-  .vt.on .n{color:#bfe0ff}
-  .vt .s{font-size:9px;color:var(--tx3);margin-top:2px}
-  .vt .s.warn{color:#c99a3c}
-
-  /* ---------- 融合分析 ---------- */
-  .dev{display:flex;align-items:center;gap:11px;padding:11px;border-radius:12px;background:var(--panel2);
-    border:1px solid var(--line);margin-bottom:9px}
-  .dev .dl{width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;
-    font-size:9px;font-weight:800;text-align:center;line-height:1.15;letter-spacing:.2px}
-  .dev .dn{font-size:11.5px;font-weight:700;color:#d3e2f8}
-  .dev .ds{font-size:9.5px;color:var(--tx3);margin-top:2px;line-height:1.45}
-  .mgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-  .mg{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px}
-  .mg .l{font-size:9px;color:var(--tx3);line-height:1.3}
-  .mg .v{font-size:15px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;color:#e9f0ff}
-  .mg .v u{font-size:9px;font-weight:400;color:#6b81a5;text-decoration:none;margin-left:2px}
-  .mg .d{font-size:9px;margin-top:2px}
-  .up{color:#ff7a7a}   /* 球速上升 = 红（国内习惯） */
-  .dn{color:#5ee9a0}
-  .verdict{border-radius:12px;padding:12px;font-size:11px;line-height:1.72;border:1px solid}
-  .v-g{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.32);color:#b8ecca}
-  .v-w{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.32);color:#f2d79d}
-  .v-b{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.32);color:#f3b9b9}
-  .verdict .vh{font-size:11.5px;font-weight:800;margin-bottom:5px;display:flex;align-items:center;gap:6px}
-  .mx{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;background:var(--panel2);
-    border:1px solid var(--line);margin-bottom:8px}
-  .mx .mxv{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;flex:none;width:64px}
-  .mx .mxt{flex:1;min-width:0;font-size:10.5px;color:var(--tx2);line-height:1.5}
-  .mx .mxt b{color:#cfe0fb;display:block;font-size:11px;margin-bottom:1px}
+  /* ---------- 底部提示（仅桌面端首屏） ---------- */
+  @media(min-width:900px){
+    #hint{
+      position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+      font-size:11px;color:#3f5273;letter-spacing:.3px;z-index:11;
+      pointer-events:none;transition:opacity .5s ease;
+    }
+    #hint.off{opacity:0}
+  }
+  @media(max-width:899px){ #hint{display:none} }
 </style>
 </head>
 <body>
-<div id="phone">
 
-  <!-- ================= 1. 拍摄规范引导 ================= -->
-  <section class="screen on" id="s-guide">
-    <div class="topbar">
-      <div class="ttl">拍摄前规范确认<span class="sub">不符合规范会导致 AI 无法识别关节点</span></div>
-      <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+<div id="bar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span>AI BASEBALL</div>
+    <div class="seg" id="seg">
+      <button class="tab on" data-mode="pitch" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><path d="M4.5 5.5c3 3 3.6 9.4 1.2 13M19.5 5.5c-3 3-3.6 9.4-1.2 13"/>
+        </svg>
+        投球分析
+      </button>
+      <button class="tab" data-mode="hit" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 3.5 20 9M17.5 6.5 8 16l-3.5 7L11 19.5 20.5 10z"/>
+        </svg>
+        打击分析
+      </button>
     </div>
-    <div class="scroll">
-      <div class="hero">
-        <h1>拍好这一段<br>比多投 100 球更重要</h1>
-        <p>AI 通过 2D 姿态估计捕捉关节点、计算肩髋分离角与外旋角。240fps 高速画面下，任何抖动、逆光或拍摄角度偏差，都会被算法放大成错误诊断。</p>
-      </div>
-      <div class="pad" style="padding-top:12px">
-        <div class="prog"><i id="progBar"></i></div>
+  </div>
+</div>
 
-        <div class="grp">
-          <div class="grp-h"><div class="n">A</div><div class="t">核心参数设置</div><div class="line"></div></div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">必须使用系统相机「慢动作（Slo-Mo）」</div>
-              <div class="rd">不要在普通录像模式拍摄。慢动作是唯一能冻结手腕挥臂与出手瞬间的录制方式。</div>
-            </div>
-            <span class="pill p-bad crit">强制</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">帧率锁定 1080p @ <i>240 FPS</i></div>
-              <div class="rd">最低不得低于 <b>120 FPS</b>。普通 30/60 FPS 在手腕内旋（Pronation）时会产生严重<b>运动模糊</b>，算法无法识别手腕与球指关节点。<br>设置路径：设置 → 相机 → 录制慢动作视频 → 1080p 240fps</div>
-            </div>
-            <span class="pill p-bad crit">关键</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">使用原生 1x 主摄，<i>禁止数字变焦</i></div>
-              <div class="rd">不要用手指放大画面。数码变焦会降低有效画质并造成像素失真，直接拉低姿态估计精度。不够近就靠 <b>缩短拍摄距离</b> 解决。</div>
-            </div>
-            <span class="pill p-warn crit">注意</span>
-          </div>
-        </div>
-
-        <!-- 机位示意图 -->
-        <div class="dia">
-          <svg viewBox="0 0 340 150" fill="none">
-            <!-- top view -->
-            <text x="8" y="12" fill="#5f7398" font-size="9" font-weight="700">俯视图 · 开放侧 90°</text>
-            <circle cx="110" cy="82" r="13" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.4"/>
-            <text x="110" y="86" fill="#9fc7f5" font-size="8" text-anchor="middle" font-weight="700">P</text>
-            <text x="110" y="112" fill="#4d6b93" font-size="7.5" text-anchor="middle">投手</text>
-            <path d="M110 82 L300 82" stroke="#33496b" stroke-width="1" stroke-dasharray="4 4"/>
-            <path d="M292 76 L300 82 L292 88" stroke="#33496b" stroke-width="1.2"/>
-            <text x="272" y="74" fill="#4d6b93" font-size="7.5">投球方向</text>
-            <path d="M110 82 L110 138" stroke="#22d3ee" stroke-width="1.4"/>
-            <path d="M110 82 L134 122" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3 3"/>
-            <path d="M110 118 A36 36 0 0 1 124 112" stroke="#22d3ee" stroke-width="1.2"/>
-            <text x="120" y="108" fill="#22d3ee" font-size="8" font-weight="700">90°</text>
-            <rect x="98" y="138" width="24" height="10" rx="3" fill="#3b82f6"/>
-            <rect x="104" y="132" width="12" height="7" rx="2" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
-            <text x="60" y="147" fill="#4d6b93" font-size="7.5">相机（三脚架）</text>
-            <text x="136" y="126" fill="#6b81a5" font-size="7.5">4.5 ~ 5 m</text>
-            <!-- side view -->
-            <text x="188" y="12" fill="#5f7398" font-size="9" font-weight="700">侧视图 · 高度与覆盖</text>
-            <path d="M300 138 L340 138" stroke="#33496b" stroke-width="1.6"/>
-            <path d="M204 138 L204 96" stroke="#33496b" stroke-width="1.2"/>
-            <path d="M198 138 L210 138 M201 120 L207 120 M201 105 L207 105" stroke="#33496b" stroke-width="1"/>
-            <text x="206" y="118" fill="#4d6b93" font-size="7.5">1.5~1.8m</text>
-            <path d="M226 138 L212 104 M226 138 L212 128" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3 3"/>
-            <circle cx="236" cy="100" r="7" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.2"/>
-            <path d="M236 107 L236 122 M226 112 L246 112" stroke="#93a8ca" stroke-width="1.6" stroke-linecap="round"/>
-            <path d="M236 122 L230 138 M236 122 L242 138" stroke="#93a8ca" stroke-width="1.6" stroke-linecap="round"/>
-            <path d="M226 96 L226 142 M250 96 L250 142" stroke="#22c55e" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>
-            <text x="252" y="146" fill="#4a9668" font-size="7">头顶 → 脚</text>
-            <text x="222" y="152" fill="#4d6b93" font-size="7">胸前/眼部平视</text>
-          </svg>
-          <div class="cap">右投手相机置于三垒侧 · 左投手置于一垒侧 · 强制横屏</div>
-        </div>
-
-        <div class="grp" style="margin-top:18px">
-          <div class="grp-h"><div class="n">B</div><div class="t">机位与角度标准</div><div class="line"></div></div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">标准侧面视角（Open-Side 90°）</div>
-              <div class="rd">相机放在投手的<i>开放侧</i>——右投手置于三垒侧，左投手置于一垒侧，与投球方向垂直成 90°。这是检测<b>肩髋分离、MER 外旋角、前膝支撑</b>的最佳视角。</div>
-            </div>
-            <span class="pill p-bad crit">关键</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">全身完整覆盖，头顶到脚不得出画</div>
-              <div class="rd">必须包含头顶至双脚踩地点，以及手腕挥臂的<i>最高点</i>与<i>最远点</i>。严禁把脚部或出手的双手切出画面外——出画的关节等于没有数据。</div>
-            </div>
-            <span class="pill p-bad crit">强制</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">拍摄距离 4.5 ~ 5 米</div>
-              <div class="rd">距离过近会因透视畸变让四肢比例失真，过远则关节点像素太少、精度骤降。</div>
-            </div>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">镜头高度 1.5 ~ 1.8 米</div>
-              <div class="rd">与投手胸部/眼部平视。镜头过低会拍到下肢前缩、高估躯干前倾角。</div>
-            </div>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">强制横屏（Landscape）拍摄</div>
-              <div class="rd">竖屏会裁掉跨步与身体前倾的完整轨迹，无法测量跨步长度与前倾角。</div>
-            </div>
-            <span class="pill p-warn crit">注意</span>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="grp-h"><div class="n">C</div><div class="t">环境与稳定性要求</div><div class="line"></div></div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">必须使用三脚架，<i>绝对禁止手持</i></div>
-              <div class="rd">手持产生的微抖动与透视视差，会让 AI 在计算像素坐标与骨骼角度时出现<b>大幅度漂移和误判</b>。这是错误率最高的一个环节。</div>
-            </div>
-            <span class="pill p-bad crit">强制</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">光线充足，<i>顺光拍摄</i></div>
-              <div class="rd">240 FPS 快门时间极短，进光量需求极高。建议户外白天或高照度室内场馆；光源（如太阳）应在<b>相机正后方</b>，避免逆光让身体沦为黑色剪影。</div>
-            </div>
-            <span class="pill p-bad crit">关键</span>
-          </div>
-
-          <div class="rule" data-req="1">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">背景简洁</div>
-              <div class="rd">避免背景有大量走动人群或高对比度杂物，减少 AI 关节点误匹配。</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="grp-h"><div class="n">D</div><div class="t">双视角（可选 · 非强制）</div><div class="line"></div></div>
-
-          <div class="card" style="border-style:dashed;margin-bottom:8px">
-            <div class="row" style="margin-bottom:6px">
-              <span class="pill p-info">可选</span>
-              <span style="font-size:12px;font-weight:700;color:#cfe0fb">侧面视角覆盖约 80%，剩下的 20% 在后方</span>
-            </div>
-            <div class="hint">侧面 90° 视角看不到三个量：<b class="k">跨步横向偏离</b>、<b class="k">前膝扣角（Knee Valgus）</b>、<b class="k">躯干侧倾</b>。这三个只能从正面/背面视角测量，其中前膝扣角是青少年膝伤的核心预警指标。<br><br><b class="k">不上传后视角不影响主分析</b>——6 项动力链检查点仍会完整输出，只是这 3 项横向指标会标记为「未测量」。</div>
-          </div>
-
-          <div class="rule opt" data-req="0">
-            <div class="box"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#062a16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-            <div class="body">
-              <div class="rt">我会同时拍一段后方视角</div>
-              <div class="rd">机位置于<b>本垒后方</b>（捕手视角，拍投手正面）或<b>投手丘后方</b>（拍投手背面），正对投球方向；距离约 <b>5 – 6 m</b>，高度 1.5 – 1.8 m，同样横屏 + 三脚架 + 顺光。<br>两机位<b>同时开机录同一次投球</b>即可，不需要时间码——App 用<b>抬腿启动帧 + 出手帧</b>两个锚点做自动对齐。</div>
-            </div>
-            <span class="pill p-gray crit">可选</span>
-          </div>
-        </div>
-
-        <div class="note" style="margin-bottom:6px">
-          <span>💡</span>
-          <div>从相册导入时请选<b style="color:#bfe0ff">「慢动作」原片</b>（保持慢放状态），不要先在相册里剪辑或加速导出，否则帧率会被压缩回 30fps。</div>
-        </div>
-      </div>
-    </div>
-    <div class="foot" style="border-top:1px solid var(--line);background:linear-gradient(0deg,#0a1120,#0a1120f0)">
-      <div class="hint" style="margin-bottom:9px;text-align:center">已确认 <b class="k" id="cnt">0</b> / 11 项拍摄规范</div>
-      <button class="btn" id="btnGo" disabled>确认并上传视频</button>
-    </div>
-  </section>
-
-  <!-- ================= 2. 上传 ================= -->
-  <section class="screen" id="s-up">
-    <div class="topbar">
-      <div class="back" data-back="s-guide">←</div>
-      <div class="ttl">导入投球视频<span class="sub">1 段完整投球动作（慢动作原片）</span></div>
-      <div class="dots"><i></i><i class="on"></i><i></i><i></i><i></i></div>
-    </div>
-    <div class="scroll pad">
-      <div class="slots">
-        <div class="slot" id="slotA">
-          <img class="thumb" id="thumbA" alt="">
-          <div class="sl">① 开放侧 90° 视角 <span class="pill p-bad">必填</span></div>
-          <div class="sd">右投手置于三垒侧 / 左投手置于一垒侧。<br>覆盖全部 <b>6 项动力链检查点</b>。</div>
-        </div>
-        <div class="slot" id="slotB">
-          <img class="thumb" id="thumbB" alt="">
-          <div class="sl">② 后方视角 <span class="pill p-gray">可选</span></div>
-          <div class="sd">本垒后方 / 投手丘后方，正对投球方向。<br>上传后解锁 <b>跨步横向偏离 · 前膝扣角 · 躯干侧倾</b>。</div>
-          <div class="rm" id="rmB">移除</div>
-        </div>
-      </div>
-      <input type="file" id="fileA" accept="video/*" style="display:none">
-      <input type="file" id="fileB" accept="video/*" style="display:none">
-
-      <div id="vinfo" style="display:none;margin-top:16px">
-        <div class="grp-h"><div class="n">✓</div><div class="t">源文件与画质自检</div><div class="line"></div></div>
-        <div class="card" style="margin-bottom:8px">
-          <div class="kv"><span>① 文件名</span><span id="vName" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</span></div>
-          <div class="kv"><span>分辨率 / 时长</span><span id="vRes">-</span></div>
-          <div class="kv"><span>方向</span><span id="vOri">-</span></div>
-        </div>
-
-        <div id="checks">
-          <div class="chk"><div class="st" id="c1">…</div><span>分辨率 ≥ 1080p</span><span class="v" id="c1v">检测中</span></div>
-          <div class="chk"><div class="st" id="c2">…</div><span>帧率 ≥ 120 FPS</span><span class="v" id="c2v">检测中</span></div>
-          <div class="chk"><div class="st" id="c3">…</div><span>横屏拍摄</span><span class="v" id="c3v">检测中</span></div>
-        </div>
-        <div id="fpsTip" class="note" style="display:none;margin-top:10px"></div>
-
-        <div id="rearInfo" style="display:none;margin-top:14px">
-          <div class="grp-h"><div class="n">②</div><div class="t">后视角已接入</div><div class="line"></div></div>
-          <div class="card">
-            <div class="kv"><span>后视角帧率</span><span id="rFps">-</span></div>
-            <div class="kv"><span>分辨率</span><span id="rRes">-</span></div>
-            <div class="kv"><span>对齐方式</span><span id="rSync" style="color:#5ee9a0">双锚点自动对齐</span></div>
-          </div>
-          <div class="note" style="margin-top:8px">
-            <span>🔗</span>
-            <div>两路视频时长不同、开机时刻不同都没关系。App 在各自时间轴上定位<b style="color:#bfe0ff">抬腿启动帧 + 出手帧</b>两个锚点，做仿射时间映射后再取其余关键帧——只用一个锚点解不出时长差和起始偏移。</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="foot" style="border-top:1px solid var(--line)">
-      <button class="btn" id="btnAnalyze" disabled>开始 AI 分析</button>
-    </div>
-  </section>
-
-  <!-- ================= 3. 分析中 ================= -->
-  <section class="screen" id="s-an">
-    <div class="topbar"><div class="ttl">AI 分析中<span class="sub">端侧姿态估计 · 不上传云端</span></div>
-      <div class="dots"><i></i><i></i><i class="on"></i><i></i><i></i></div></div>
-    <div class="an-wrap">
-      <div class="spinner"></div>
-      <div style="font-size:14px;font-weight:700" id="anTtl">正在解码视频帧…</div>
-      <div class="hint" style="margin-top:6px;text-align:center" id="anSub">提取 240fps 原始帧序列</div>
-      <div class="steps" id="steps">
-        <div class="step act"><i class="d"></i>解码高速帧序列</div>
-        <div class="step"><i class="d"></i>人体姿态估计（33 关键点）</div>
-        <div class="step"><i class="d"></i>定位 6 个动力链关键帧</div>
-        <div class="step"><i class="d"></i>计算关节角度与旋转扭矩</div>
-        <div class="step"><i class="d"></i>生成防伤诊断报告</div>
-      </div>
-      <div class="prog" style="width:100%;max-width:300px;margin-top:22px"><i id="anBar"></i></div>
-    </div>
-  </section>
-
-  <!-- ================= 4. 逐帧诊断 ================= -->
-  <section class="screen" id="s-res">
-    <div class="topbar">
-      <div class="back" data-back="s-up">←</div>
-      <div class="ttl" id="resTtl">动力链关键帧诊断<span class="sub" id="resSub">点击下方序列切换检查点</span></div>
-      <div class="dots"><i></i><i></i><i></i><i class="on"></i><i></i></div>
-    </div>
-    <div class="vtabs" id="vtabs">
-      <div class="vt on" data-view="side">
-        <div class="n">开放侧 90°</div>
-        <div class="s">主视角 · 6 项动力链</div>
-      </div>
-      <div class="vt lock" data-view="rear">
-        <div class="n" id="vtRearName">后方视角</div>
-        <div class="s warn" id="vtRearSub">未上传 · 3 项未测量</div>
-      </div>
-    </div>
-    <div class="scroll">
-      <div class="stage" id="stage">
-        <img id="frameImg" alt="">
-        <svg id="ov" viewBox="0 0 1000 562.5" preserveAspectRatio="none"></svg>
-        <div class="tag"><div class="c" id="cpCode">CP 1</div><div class="n" id="cpName">后脚位置</div></div>
-        <div class="alert" id="cpAlert">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-          <span id="cpAlertTxt"></span>
-        </div>
-        <div class="meta" id="stageMeta">1080p @240FPS · 开放侧 90° 机位</div>
-      </div>
-
-      <div class="thumbs" id="thumbs"></div>
-      <div class="scrub">
-        <div class="row" style="gap:8px">
-          <span class="hint" style="flex:none">帧</span>
-          <input type="range" id="scrub" min="0" max="100" value="10">
-          <span class="hint" style="flex:none;font-variant-numeric:tabular-nums" id="scrubT">0.00s</span>
-        </div>
-        <button class="btn ghost" id="btnSetFrame" style="padding:10px;font-size:12px;margin-top:2px">用当前帧替换该检查点画面</button>
-      </div>
-
-      <div class="pad" style="padding-top:4px">
-        <div class="note" id="rearHint" style="display:none;margin-bottom:12px;cursor:pointer">
-          <span>📐</span>
-          <div id="rearHintTxt"></div>
-        </div>
-
-        <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px">
-          <div style="font-size:13px;font-weight:800" id="dtTitle">CP 1 诊断明细</div>
-          <span class="pill p-ok" id="dtBadge">满分</span>
-        </div>
-
-        <div class="metrics">
-          <div class="mt"><div class="l" id="m1l"></div><div class="v" id="m1v"></div><div class="g" id="m1g"></div></div>
-          <div class="mt"><div class="l" id="m2l"></div><div class="v" id="m2v"></div><div class="g" id="m2g"></div></div>
-        </div>
-
-        <div class="fb">
-          <div class="fh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span>动作诊断结论</span></div>
-          <div class="ft" id="fbDesc"></div>
-        </div>
-        <div class="fb risk">
-          <div class="fh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg><span>青少年防伤与改进建议</span></div>
-          <div class="ft" id="fbAdvice"></div>
-        </div>
-
-        <div class="note" style="margin-top:12px">
-          <span>🔬</span>
-          <div><b style="color:#bfe0ff" id="confTxt">骨骼识别置信度 94%</b> · 本原型为流程演示，骨架标注为示意叠加；正式版由端侧姿态模型输出真实关键点坐标。</div>
-        </div>
-      </div>
-    </div>
-    <div class="foot" style="border-top:1px solid var(--line)">
-      <button class="btn" id="btnReport">查看完整评估报告</button>
-    </div>
-  </section>
-
-  <!-- ================= 5. 报告 ================= -->
-  <section class="screen" id="s-rep">
-    <div class="topbar">
-      <div class="back" data-back="s-res">←</div>
-      <div class="ttl">综合评估报告<span class="sub" id="repDate">-</span></div>
-      <div class="dots"><i></i><i></i><i></i><i></i><i class="on"></i></div>
-    </div>
-    <div class="scroll">
-      <div class="score-hero">
-        <div class="ring">
-          <svg width="96" height="96">
-            <circle cx="48" cy="48" r="41" stroke="#1b2942" stroke-width="7" fill="none"/>
-            <circle id="ringArc" cx="48" cy="48" r="41" stroke="#3b82f6" stroke-width="7" fill="none"
-              stroke-linecap="round" stroke-dasharray="257.6" stroke-dashoffset="257.6"/>
-          </svg>
-          <div class="in"><div class="n" id="repScore">0</div><div class="u">/ 100</div></div>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="row" style="gap:8px;margin-bottom:6px">
-            <span class="pill p-info" id="repGrade">B+</span>
-            <span class="pill p-gray">右投 · 侧面 90°</span>
-          </div>
-          <div style="font-size:12px;color:#cfe0fb;line-height:1.6" id="repSummary"></div>
-        </div>
-      </div>
-
-      <div class="pad" style="padding-top:0">
-        <div class="grp-h"><div class="n">1</div><div class="t">六项动力链检查点</div><div class="line"></div></div>
-        <div class="card" style="padding:2px 12px" id="repList"></div>
-
-        <div class="grp-h" style="margin-top:18px"><div class="n">2</div><div class="t">优先改进顺序</div><div class="line"></div></div>
-        <div id="repPrio"></div>
-
-        <div class="grp-h" style="margin-top:18px"><div class="n">3</div><div class="t">横向指标（后视角）</div><div class="line"></div></div>
-        <div id="repLateral"></div>
-
-        <div class="grp-h" style="margin-top:18px"><div class="n">4</div><div class="t">设备数据融合（可选）</div><div class="line"></div></div>
-        <div id="repDevice"></div>
-
-        <div class="grp-h" style="margin-top:18px"><div class="n">5</div><div class="t">投球量与休息参考</div><div class="line"></div></div>
-        <div class="card">
-          <table class="tbl">
-            <tr><th>年龄</th><th>单日上限</th><th>单场建议</th><th>关注</th></tr>
-            <tr><td>9 – 10 岁</td><td>50 球</td><td>≤ 35 球</td><td>基础动作定型</td></tr>
-            <tr><td>11 – 12 岁</td><td>75 球</td><td>≤ 50 球</td><td>小马联盟肘风险</td></tr>
-            <tr><td>13 – 14 岁</td><td>95 球</td><td>≤ 65 球</td><td>肩袖疲劳监控</td></tr>
-            <tr><td>15 – 16 岁</td><td>95 球</td><td>≤ 70 球</td><td>外旋角稳定性</td></tr>
-            <tr><td>17 – 18 岁</td><td>105 球</td><td>≤ 80 球</td><td>全年投球量管理</td></tr>
-          </table>
-          <div class="hint" style="margin-top:10px">参考美国青少年投球安全指南（Pitch Smart）通用区间。<b class="k">所有达标球数后须安排等量休息日</b>；连续投球日数越多，受伤风险越高。实际以所在联盟规定及教练安排为准。</div>
-        </div>
-
-        <div class="grp-h" style="margin-top:18px"><div class="n">6</div><div class="t">下次拍摄计划</div><div class="line"></div></div>
-        <div class="card">
-          <div class="kv"><span>建议复查周期</span><span>每 2 周 1 次</span></div>
-          <div class="kv"><span>每次采样</span><span>3 – 5 球 · 取中位数</span></div>
-          <div class="kv"><span>机位</span><span id="nextCam">开放侧 90°（同上次）</span></div>
-          <div class="kv"><span>趋势关注</span><span>MER 外旋角 / 肩髋分离角</span></div>
-        </div>
-      </div>
-      <div class="foot" style="padding-top:0">
-        <div class="disc">本报告由端侧姿态估计模型生成，用于训练参考与风险提示，<b>不构成医疗诊断</b>。若出现肘部或肩部疼痛，请立即停止投球并就医。</div>
-      </div>
-    </div>
-    <div class="foot" style="border-top:1px solid var(--line)">
-      <button class="btn ghost" id="btnAgain">再分析一段视频</button>
-    </div>
-  </section>
+<div id="stage">
+  <div id="load"><div class="spin"></div><div class="lt">正在载入分析引擎…</div></div>
+  <div id="hint">切换上方标签可查看另一种动作模式 · 已上传的视频不会丢失</div>
 </div>
 
 <script>
 /* =====================================================================
-   AI PITCHER · 原型逻辑
-   帧提取 / 画质自检 / SVG 骨骼·角度·旋转标注
+   AI BASEBALL · 双模式外壳
+   投球 / 打击两个原型各自独立运行在 iframe 内——CSS 与 JS 完全隔离，
+   互不污染；两个 iframe 并存，切换时状态（已上传视频、已截关键帧）保留。
    ===================================================================== */
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-
-/* ---------- 检查点数据（6 大动力链要点） ---------- */
-const CPS = [
-  {
-    id:1, code:'CP 1', name:'后脚位置 / 蓄力角', tPct:0.10, conf:96, deduction:0,
-    m1:{l:'后膝 Power Angle', v:'132°', g:'标准范围 125° – 140°', c:'var(--blue)'},
-    m2:{l:'膝盖提前下沉率', v:'3.2%', g:'阈值 < 5%', c:'var(--green)'},
-    alert:null,
-    desc:'后脚形成了标准的蓄力角（Power Angle），后膝屈曲充分且未出现向下的提前坍塌。骨盆保持水平，重心仍稳稳压在支撑腿上，动力链蓄力完整——这是整个投球动作的地基。',
-    advice:'保持当前下肢稳定性训练（单腿硬拉、分腿蹲）。抬腿阶段的核心目标是「不着急」，重心前移一旦提前，后面所有环节都会替它还债。',
-    anno:{
-      guides:[{x1:0.42,y1:0.22,x2:0.42,y2:0.92,color:'#64748b',label:'重心投影线'}],
-      bones:[
-        {pts:[[0.42,0.50],[0.44,0.32],[0.44,0.25]],color:'#38bdf8'},
-        {pts:[[0.34,0.86],[0.32,0.66],[0.42,0.50]],color:'#22d3ee'},
-        {pts:[[0.42,0.50],[0.53,0.60],[0.50,0.74]],color:'#22c55e'},
-        {pts:[[0.44,0.34],[0.36,0.42],[0.44,0.46]],color:'#93a8ca'},
-        {pts:[[0.44,0.34],[0.51,0.42],[0.44,0.46]],color:'#93a8ca'}
-      ],
-      arcs:[{v:[0.32,0.66],p1:[0.42,0.50],p2:[0.34,0.86],r:0.065,label:'132°',color:'#3b82f6'}],
-      marks:[{x:0.34,y:0.87,label:'后脚踩实',color:'#22d3ee'}]
-    },
-    rear:{
-      conf:95,
-      m1:{l:'骨盆倾斜角', v:'4°', g:'标准范围 < 8°', c:'var(--green)'},
-      m2:{l:'支撑膝内扣', v:'无', g:'标准：不内扣', c:'var(--green)'},
-      desc:'后方视角显示抬腿阶段骨盆保持水平，未出现支撑侧髋部下沉（Hip Drop）。支撑腿膝关节力线对齐，未见内扣。骨盆一旦在抬腿时塌下去，后续所有环节都会失去稳定的旋转轴。',
-      advice:'骨盆控制良好。可在抬腿最高点做 2 秒静态保持（单腿站），把骨盆稳定性练成条件反射。',
-      anno:{
-        guides:[{x1:0.40,y1:0.505,x2:0.62,y2:0.505,color:'#22c55e',label:'骨盆水平参考'}],
-        bones:[
-          {pts:[[0.50,0.33],[0.50,0.24]],color:'#38bdf8'},
-          {pts:[[0.42,0.36],[0.58,0.36]],color:'#38bdf8'},
-          {pts:[[0.44,0.535],[0.56,0.505]],color:'#38bdf8'},
-          {pts:[[0.50,0.36],[0.50,0.51]],color:'#38bdf8'},
-          {pts:[[0.44,0.535],[0.43,0.68],[0.44,0.86]],color:'#22d3ee'},
-          {pts:[[0.56,0.505],[0.62,0.62],[0.65,0.73]],color:'#22c55e'},
-          {pts:[[0.42,0.36],[0.36,0.46],[0.47,0.48]],color:'#93a8ca'},
-          {pts:[[0.58,0.36],[0.64,0.46],[0.53,0.48]],color:'#93a8ca'}
-        ],
-        arcs:[{v:[0.43,0.68],p1:[0.44,0.86],p2:[0.44,0.535],r:0.055,label:'支撑膝力线对齐',color:'#22c55e'}],
-        marks:[{x:0.44,y:0.86,label:'支撑脚',color:'#22d3ee'}]
-      }
-    }
-  },
-  {
-    id:2, code:'CP 2', name:'前脚落地与肘高', tPct:0.33, conf:91, deduction:10,
-    m1:{l:'触地瞬间肘高（Arm Slot）', v:'-12°', g:'标准 ≥ 0°（与肩平齐）', c:'var(--red)'},
-    m2:{l:'前脚落地指向', v:'对齐本垒', g:'允许偏差 ±5°', c:'var(--green)'},
-    alert:'抬手滞后 Arm Late · 肘关节受力激增',
-    desc:'前脚触地瞬间，投掷侧肘部低于双肩连线 12°。手臂抬升滞后（Arm Late）意味着后续躯干猛烈旋转时，肘关节被迫承担本应由躯干传递的负荷——这是青少年投手中最常见、也最危险的时序错误。',
-    advice:'立即加入「肩胛骨提前预激活」和「分球定时（Timing）」训练：弹力带外旋激活 2 组 × 15 次，配合「落地即抬手」的口令式分解投球。此阶段不改，小马联盟肘（Little League Elbow）风险显著上升。',
-    anno:{
-      guides:[
-        {x1:0.32,y1:0.36,x2:0.68,y2:0.36,color:'#ef4444',label:'双肩连线'},
-        {x1:0.46,y1:0.22,x2:0.46,y2:0.92,color:'#64748b'}
-      ],
-      bones:[
-        {pts:[[0.46,0.50],[0.46,0.34],[0.46,0.27]],color:'#38bdf8'},
-        {pts:[[0.30,0.86],[0.34,0.68],[0.46,0.50]],color:'#22d3ee'},
-        {pts:[[0.46,0.50],[0.62,0.62],[0.74,0.80],[0.80,0.86]],color:'#22c55e'},
-        {pts:[[0.46,0.36],[0.60,0.44],[0.70,0.36]],color:'#ef4444'},
-        {pts:[[0.46,0.36],[0.34,0.36],[0.26,0.40]],color:'#93a8ca'}
-      ],
-      arcs:[{v:[0.46,0.36],p1:[0.68,0.36],p2:[0.62,0.46],r:0.075,label:'肘低于肩 12°',color:'#ef4444'}],
-      marks:[{x:0.74,y:0.83,label:'前脚落地',color:'#22c55e'},{x:0.60,y:0.44,label:'肘',color:'#ef4444'}]
-    },
-    rear:{
-      conf:89,
-      alert:'临界值 · 前膝扣角 11°（>15° 需停投评估）',
-      m1:{l:'跨步横向偏离', v:'+6 cm', g:'允许范围 ±10 cm', c:'var(--green)'},
-      m2:{l:'前膝扣角 Knee Valgus', v:'11°', g:'标准 <15° · >20° 高风险', c:'var(--amber)'},
-      desc:'前脚落点相对身体中线偏离 +6cm（略偏三垒侧），仍在允许范围内，但已接近临界。前膝扣角 11°，膝关节力线基本对齐。<b>这是侧视角完全测不到的两个量</b>——跨步偏离会直接吃掉球速并加重肩部代偿，前膝扣角则是青少年膝伤与投球失准的前兆。',
-      advice:'接近临界值，需持续监控。加入臀中肌激活（侧向弹力带行走 3 组 × 15 步）与单腿落地控制训练。若前膝扣角连续两次采样超过 15°，应暂停投球并转介队医评估。',
-      anno:{
-        guides:[
-          {x1:0.40,y1:0.20,x2:0.40,y2:0.92,color:'#64748b',label:'身体中线'},
-          {x1:0.40,y1:0.91,x2:0.78,y2:0.91,color:'#22c55e'}
-        ],
-        bones:[
-          {pts:[[0.46,0.31],[0.46,0.22]],color:'#38bdf8'},
-          {pts:[[0.37,0.34],[0.56,0.34]],color:'#38bdf8'},
-          {pts:[[0.40,0.50],[0.57,0.50]],color:'#38bdf8'},
-          {pts:[[0.46,0.34],[0.47,0.50]],color:'#38bdf8'},
-          {pts:[[0.40,0.50],[0.39,0.67],[0.40,0.86]],color:'#22d3ee'},
-          {pts:[[0.57,0.50],[0.66,0.66],[0.78,0.86]],color:'#22c55e'},
-          {pts:[[0.37,0.34],[0.28,0.28],[0.30,0.20]],color:'#93a8ca'},
-          {pts:[[0.56,0.34],[0.64,0.34],[0.66,0.40]],color:'#93a8ca'}
-        ],
-        arcs:[{v:[0.66,0.66],p1:[0.78,0.86],p2:[0.57,0.50],r:0.075,label:'膝扣角 11°',color:'#f59e0b'}],
-        marks:[{x:0.78,y:0.86,label:'落点 +6cm',color:'#f59e0b'}]
-      }
-    }
-  },
-  {
-    id:3, code:'CP 3', name:'肩髋分离（Separation）', tPct:0.45, conf:93, deduction:0,
-    m1:{l:'肩髋分离角 Δθ', v:'46°', g:'标准范围 35° – 60°', c:'var(--purple)'},
-    m2:{l:'骨盆朝向', v:'已正对本垒', g:'胸部保持侧向', c:'var(--green)'},
-    alert:null,
-    desc:'前脚落地瞬间，骨盆已正对本垒，而胸部仍保持侧向——躯干产生了 46° 的扭矩分离。这段「拧毛巾」式的弹性势能，是球速最核心的来源，同时把负荷从手臂分流到躯干与下肢。',
-    advice:'核心传导非常出色，保持躯干旋转爆发力训练（药球侧向砸墙、缆绳抗旋）。注意：青少年不宜盲目追求更大分离角，超过 60° 反而会加重腰椎与肩前侧负担。',
-    anno:{
-      guides:[
-        {x1:0.36,y1:0.32,x2:0.60,y2:0.28,color:'#a855f7',label:'肩线（仍关闭）'},
-        {x1:0.38,y1:0.51,x2:0.56,y2:0.49,color:'#22c55e',label:'髋线（已打开）'}
-      ],
-      bones:[
-        {pts:[[0.46,0.50],[0.44,0.34],[0.44,0.27]],color:'#38bdf8'},
-        {pts:[[0.30,0.86],[0.34,0.68],[0.46,0.50]],color:'#22d3ee'},
-        {pts:[[0.46,0.50],[0.62,0.62],[0.74,0.80],[0.80,0.86]],color:'#22c55e'},
-        {pts:[[0.50,0.30],[0.62,0.36],[0.70,0.30]],color:'#93a8ca'},
-        {pts:[[0.38,0.34],[0.28,0.30],[0.22,0.34]],color:'#93a8ca'}
-      ],
-      arcs:[{v:[0.46,0.40],p1:[0.60,0.28],p2:[0.56,0.49],r:0.10,label:'肩髋分离 46°',color:'#a855f7'}],
-      rot:[{c:[0.46,0.40],r:0.155,a0:200,a1:295,label:'骨盆先转',color:'#22c55e'}]
-    },
-    rear:{
-      conf:94,
-      m1:{l:'躯干扭转角（后视角直读）', v:'46°', g:'与侧视推算值一致性校验', c:'var(--purple)'},
-      m2:{l:'肩线倾斜', v:'5°', g:'标准 < 10°', c:'var(--green)'},
-      desc:'后方视角直接测得躯干扭转 46°，与侧视投影推算值一致——说明这个分离是真实存在的三维旋转，不是视角造成的假象。<b>两视角数值互相印证，是双视角分析最核心的价值。</b>肩线倾斜 5°，在正常范围内。',
-      advice:'双视角数值一致，数据可信度高。维持抗旋核心训练（药球侧向砸墙、缆绳抗旋），注意不要为了追求更大分离角而牺牲腰椎稳定。',
-      anno:{
-        guides:[
-          {x1:0.36,y1:0.325,x2:0.57,y2:0.315,color:'#a855f7',label:'肩线（投影）'},
-          {x1:0.39,y1:0.505,x2:0.58,y2:0.49,color:'#22c55e',label:'髋线（投影）'}
-        ],
-        bones:[
-          {pts:[[0.46,0.30],[0.46,0.22]],color:'#38bdf8'},
-          {pts:[[0.36,0.33],[0.57,0.32]],color:'#a855f7'},
-          {pts:[[0.39,0.505],[0.58,0.49]],color:'#22c55e'},
-          {pts:[[0.465,0.33],[0.485,0.50]],color:'#38bdf8'},
-          {pts:[[0.40,0.50],[0.39,0.67],[0.40,0.86]],color:'#22d3ee'},
-          {pts:[[0.57,0.49],[0.66,0.65],[0.78,0.86]],color:'#22c55e'},
-          {pts:[[0.36,0.33],[0.28,0.30],[0.30,0.20]],color:'#93a8ca'},
-          {pts:[[0.57,0.32],[0.65,0.34],[0.67,0.42]],color:'#93a8ca'}
-        ],
-        rot:[{c:[0.47,0.42],r:0.135,a0:205,a1:305,label:'躯干扭转 46°',color:'#a855f7'}],
-        marks:[{x:0.57,y:0.32,label:'肩仍关闭',color:'#a855f7'}]
-      }
-    }
-  },
-  {
-    id:4, code:'CP 4', name:'最大外旋角（MER）', tPct:0.56, conf:88, deduction:6,
-    m1:{l:'肩关节最大外旋角', v:'148°', g:'基准范围 165° – 180°', c:'var(--amber)'},
-    m2:{l:'对比个人历史基准', v:'-17°', g:'下降 >10° 触发预警', c:'var(--amber)'},
-    alert:'受伤警讯 · 外旋受限 / 肩袖疲劳',
-    desc:'投掷臂最大外旋角为 148°，低于同年龄段基准，且较该投手历史均值下降 17°。外旋角突然下降通常不是技术问题，而是肩袖肌群疲劳或肩前侧关节囊紧绷的信号——身体在自动「限速」以保护自己。',
-    advice:'优先降低投球量，其次再谈技术。增加胸小肌与背阔肌拉伸、肩袖外旋稳定性训练（侧卧外旋 3 组 × 12 次）。青少年严禁为追求极限外旋做任何强制牵拉，骨骺未闭合时风险极高。',
-    anno:{
-      guides:[{x1:0.42,y1:0.30,x2:0.72,y2:0.30,color:'#f59e0b',label:'肩线'}],
-      bones:[
-        {pts:[[0.46,0.50],[0.44,0.34],[0.44,0.27]],color:'#38bdf8'},
-        {pts:[[0.30,0.86],[0.34,0.68],[0.46,0.50]],color:'#22d3ee'},
-        {pts:[[0.46,0.50],[0.62,0.62],[0.74,0.80],[0.80,0.86]],color:'#22c55e'},
-        {pts:[[0.50,0.32],[0.64,0.42],[0.68,0.22]],color:'#f59e0b'},
-        {pts:[[0.42,0.34],[0.30,0.36],[0.22,0.32]],color:'#93a8ca'}
-      ],
-      arcs:[{v:[0.64,0.42],p1:[0.50,0.32],p2:[0.68,0.22],r:0.085,label:'MER 148°',color:'#f59e0b'}],
-      marks:[{x:0.68,y:0.22,label:'球',color:'#f59e0b'}]
-    },
-    rear:{
-      conf:87,
-      m1:{l:'肘部外展角', v:'88°', g:'标准范围 85° – 95°', c:'var(--green)'},
-      m2:{l:'头部中线偏移', v:'2 cm', g:'标准 < 5 cm', c:'var(--green)'},
-      desc:'MER 阶段肘部相对躯干外展 88°，处于标准区间，未出现「肘部下沉」。头部保持在身体中线附近、未甩头，说明颈椎没有代偿性侧屈。<b>头部偏移是很多青少年投手被忽略的细节</b>，甩头会让躯干旋转失去参照，连带影响出手点稳定性。',
-      advice:'肘部高度维持良好，头部稳定。继续保持视线锁定本垒的习惯；可在镜像前练习投球，让球员自己看到头部位置。',
-      anno:{
-        guides:[
-          {x1:0.40,y1:0.20,x2:0.40,y2:0.92,color:'#64748b',label:'身体中线'},
-          {x1:0.38,y1:0.34,x2:0.40,y2:0.50,color:'#22c55e',stroke:'dash'}
-        ],
-        bones:[
-          {pts:[[0.46,0.31],[0.46,0.22]],color:'#38bdf8'},
-          {pts:[[0.38,0.34],[0.56,0.34]],color:'#38bdf8'},
-          {pts:[[0.40,0.50],[0.57,0.50]],color:'#38bdf8'},
-          {pts:[[0.47,0.34],[0.49,0.50]],color:'#38bdf8'},
-          {pts:[[0.40,0.50],[0.39,0.67],[0.40,0.86]],color:'#22d3ee'},
-          {pts:[[0.57,0.50],[0.66,0.65],[0.78,0.86]],color:'#22c55e'},
-          {pts:[[0.38,0.34],[0.26,0.32],[0.22,0.18]],color:'#f59e0b'},
-          {pts:[[0.56,0.34],[0.62,0.42],[0.52,0.46]],color:'#93a8ca'}
-        ],
-        arcs:[{v:[0.38,0.34],p1:[0.26,0.32],p2:[0.40,0.50],r:0.07,label:'肘外展 88°',color:'#f59e0b'}],
-        marks:[{x:0.22,y:0.18,label:'球',color:'#f59e0b'}]
-      }
-    }
-  },
-  {
-    id:5, code:'CP 5', name:'前膝支撑与躯干前倾', tPct:0.66, conf:94, deduction:0,
-    m1:{l:'躯干向前倾角', v:'34°', g:'标准范围 30° – 45°', c:'var(--blue)'},
-    m2:{l:'手腕内旋 Pronation', v:'已完成', g:'出手瞬间完成', c:'var(--green)'},
-    alert:null,
-    desc:'出手瞬间前膝有效吸收地面反作用力并接近锁定伸直，躯干向前倾斜 34°，把全身重量顺畅地传导到球上。手腕内旋动作规范完成，让肘内侧韧带免于承受反向撕扯。',
-    advice:'支撑力极佳。可继续强化单腿落地稳定性与髋部抗前倾训练，把这一环的优势固化成本能。',
-    anno:{
-      guides:[{x1:0.48,y1:0.48,x2:0.48,y2:0.06,color:'#64748b',label:'垂直基准线'}],
-      bones:[
-        {pts:[[0.48,0.48],[0.42,0.32],[0.41,0.25]],color:'#38bdf8'},
-        {pts:[[0.44,0.50],[0.34,0.62],[0.30,0.82]],color:'#22d3ee'},
-        {pts:[[0.48,0.48],[0.64,0.58],[0.74,0.78],[0.78,0.86]],color:'#22c55e'},
-        {pts:[[0.46,0.32],[0.34,0.24],[0.22,0.20]],color:'#f59e0b'},
-        {pts:[[0.44,0.33],[0.36,0.40],[0.30,0.44]],color:'#93a8ca'}
-      ],
-      arcs:[{v:[0.48,0.48],p1:[0.48,0.06],p2:[0.42,0.32],r:0.13,label:'前倾 34°',color:'#3b82f6'}],
-      marks:[{x:0.20,y:0.19,label:'出手点',color:'#f59e0b'}]
-    },
-    rear:{
-      conf:92,
-      m1:{l:'躯干侧倾角', v:'12°', g:'标准 < 15°', c:'var(--green)'},
-      m2:{l:'前膝过伸锁定', v:'无', g:'标准：不锁死', c:'var(--green)'},
-      desc:'出手瞬间躯干侧倾 12°，在正常范围内，说明躯干没有向一垒侧过度倾倒。<b>过度侧倾（>15°）是肩部代偿的典型信号</b>——躯干倒下去，肩就得额外承担减速负荷。前膝未见过伸锁死，支撑是「吸收」而不是「顶死」。',
-      advice:'可继续强化对侧腹斜肌力量（缆绳下砍、俄罗斯转体），把侧倾角稳定在 10° 以内。前膝支撑力良好，保持。',
-      anno:{
-        guides:[{x1:0.50,y1:0.16,x2:0.50,y2:0.92,color:'#64748b',label:'垂直基准线'}],
-        bones:[
-          {pts:[[0.47,0.30],[0.46,0.22]],color:'#38bdf8'},
-          {pts:[[0.37,0.34],[0.56,0.34]],color:'#38bdf8'},
-          {pts:[[0.42,0.50],[0.58,0.50]],color:'#38bdf8'},
-          {pts:[[0.47,0.33],[0.50,0.50]],color:'#38bdf8'},
-          {pts:[[0.42,0.50],[0.41,0.67],[0.42,0.86]],color:'#22d3ee'},
-          {pts:[[0.58,0.50],[0.68,0.64],[0.78,0.86]],color:'#22c55e'},
-          {pts:[[0.40,0.34],[0.36,0.29],[0.33,0.24]],color:'#f59e0b'},
-          {pts:[[0.56,0.34],[0.62,0.40],[0.60,0.46]],color:'#93a8ca'}
-        ],
-        arcs:[{v:[0.50,0.50],p1:[0.50,0.16],p2:[0.47,0.33],r:0.14,label:'侧倾 12°',color:'#3b82f6'}],
-        marks:[{x:0.33,y:0.24,label:'出手点',color:'#f59e0b'}]
-      }
-    }
-  },
-  {
-    id:6, code:'CP 6', name:'手臂收尾与肩胛（Follow-Thru）', tPct:0.85, conf:92, deduction:0,
-    m1:{l:'投掷手终点位置', v:'对侧腰际', g:'应越过对侧腰部', c:'var(--green)'},
-    m2:{l:'背部肩胛展开', v:'完全翻转', g:'背部正对镜头', c:'var(--green)'},
-    alert:null,
-    desc:'投掷手顺畅减速并收尾于对侧腰际，双肩完全翻转、肩胛骨充分释放，减速缓冲路径足够长。收尾距离越短，手臂后侧肌群与肩胛骨承受的制动负荷越集中。',
-    advice:'良好的减速动作能极大降低肩后侧与肩胛区域的损伤风险。可用「毛巾甩鞭」动作练习完整随挥路径，禁止在收尾时强行刹车停手。',
-    anno:{
-      bones:[
-        {pts:[[0.50,0.52],[0.40,0.42],[0.36,0.35]],color:'#38bdf8'},
-        {pts:[[0.48,0.52],[0.60,0.44],[0.70,0.36]],color:'#22d3ee'},
-        {pts:[[0.52,0.52],[0.66,0.62],[0.76,0.82]],color:'#22c55e'},
-        {pts:[[0.46,0.40],[0.36,0.52],[0.28,0.62]],color:'#f59e0b'},
-        {pts:[[0.44,0.42],[0.38,0.50],[0.34,0.56]],color:'#93a8ca'}
-      ],
-      rot:[{c:[0.47,0.45],r:0.15,a0:150,a1:265,label:'肩胛翻转',color:'#a855f7'}],
-      marks:[{x:0.27,y:0.63,label:'收尾点',color:'#f59e0b'}]
-    },
-    rear:{
-      conf:93,
-      m1:{l:'后腿摆动离地', v:'自然摆动', g:'参考：不应拖地或急停', c:'var(--green)'},
-      m2:{l:'躯干收尾朝向', v:'对侧髋', g:'参考：完整越过', c:'var(--green)'},
-      desc:'随挥阶段后腿自然摆动离地，躯干收尾朝向对侧髋，减速路径完整，未出现急停。<b>后腿拖地或急停意味着减速完全由手臂承担</b>，这是肩后侧损伤的直接诱因。',
-      advice:'减速模式良好。若后续出现后腿拖地，优先检查前膝支撑力与髋部灵活性，而不是直接加投球量。',
-      anno:{
-        bones:[
-          {pts:[[0.50,0.38],[0.47,0.30]],color:'#38bdf8'},
-          {pts:[[0.40,0.34],[0.57,0.34]],color:'#38bdf8'},
-          {pts:[[0.44,0.52],[0.58,0.52]],color:'#38bdf8'},
-          {pts:[[0.51,0.38],[0.50,0.52]],color:'#38bdf8'},
-          {pts:[[0.44,0.52],[0.34,0.44],[0.28,0.36]],color:'#22d3ee'},
-          {pts:[[0.58,0.52],[0.62,0.67],[0.66,0.86]],color:'#22c55e'},
-          {pts:[[0.42,0.36],[0.34,0.48],[0.28,0.60]],color:'#f59e0b'},
-          {pts:[[0.56,0.36],[0.50,0.46],[0.46,0.54]],color:'#93a8ca'}
-        ],
-        rot:[{c:[0.50,0.46],r:0.14,a0:155,a1:270,label:'肩胛翻转完成',color:'#a855f7'}],
-        marks:[{x:0.28,y:0.60,label:'收尾点',color:'#f59e0b'},{x:0.28,y:0.36,label:'后腿摆动',color:'#22d3ee'}]
-      }
-    }
-  }
-];
-
-/* ---------- 状态 ---------- */
-let VW = 1920, VH = 1080, DUR = 0, FPS = null;          // 主视角（开放侧 90°）
-let VWr = 1920, VHr = 1080, DURr = 0, FPSr = null;      // 后视角（可选）
-let frames = {};            // cpId -> dataURL（主视角关键帧）
-let framesRear = {};        // cpId -> dataURL（后视角关键帧）
-let active = 1;
-let view = 'side';          // 'side' | 'rear'
-let videoEl = null, videoElR = null;
-let hasRear = false;
-let devData = null;         // 设备数据（Rapsodo / Blast Motion）
-
-const hasRearData = () => hasRear && Object.keys(framesRear).length > 0;
-
-/* ---------- 屏幕切换 ---------- */
-function go(id){
-  $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  const idx = ['s-guide','s-up','s-an','s-res','s-rep'].indexOf(id);
-  $$('.dots').forEach(d => {
-    Array.from(d.children).forEach((i,k)=>i.classList.toggle('on',k===idx));
-  });
-}
-$$('[data-back]').forEach(b => b.onclick = () => go(b.dataset.back));
-
-/* ---------- 引导页：规范自检勾选 ---------- */
-const TOTAL = 11;
-function refreshGuide(){
-  const n = $$('#s-guide .rule.done:not(.opt)').length;
-  $('#cnt').textContent = n;
-  $('#progBar').style.width = (n/TOTAL*100) + '%';
-  $('#btnGo').disabled = n < TOTAL;
-}
-$$('#s-guide .rule').forEach(r => r.onclick = () => { r.classList.toggle('done'); refreshGuide(); });
-
-$('#btnGo').onclick = () => go('s-up');
-
-/* ---------- 上传与自检 ---------- */
-$('#slotA').onclick = () => $('#fileA').click();
-$('#slotB').onclick = () => { if(!$('#slotB').classList.contains('done')) $('#fileB').click(); };
-$('#fileA').onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0], 'side'); };
-$('#fileB').onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0], 'rear'); };
-$('#rmB').onclick = async e => {
-  e.stopPropagation();
-  if(videoElR) videoElR.remove();
-  videoElR = null; framesRear = {}; hasRear = false; FPSr = null;
-  $('#slotB').classList.remove('done');
-  $('#thumbB').removeAttribute('src');
-  $('#rearInfo').style.display = 'none';
-  $('#fileB').value = '';
-  $('#vtRearSub').textContent = '未上传 · 3 项未测量';
-  $('#vtRearSub').classList.add('warn');
-  $('#vtabs').querySelector('[data-view="rear"]').classList.add('lock');
-  await sleep(60);
-  renderAll();
+const META = {
+  pitch: { file: 'pitch.html', label: '投球分析' },
+  hit:   { file: 'hit.html',   label: '打击分析' }
 };
 
-function makeVideo(file){
-  const v = document.createElement('video');
-  v.src = URL.createObjectURL(file);
-  v.muted = true;
-  v.playsInline = true;
-  v.preload = 'auto';
-  v.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:.01;pointer-events:none';
-  document.body.appendChild(v);
-  return v;
-}
+const stage  = document.getElementById('stage');
+const loadEl = document.getElementById('load');
+const hintEl = document.getElementById('hint');
+const tabs   = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+const frames = {};      // mode -> iframe
+const ready  = {};      // mode -> bool
+let cur = null;
 
-async function loadFile(file, which){
-  const isRear = which === 'rear';
-  const el = makeVideo(file);
-  const slot = isRear ? $('#slotB') : $('#slotA');
-  slot.classList.add('on');
-
-  try{
-    await new Promise((res, rej) => {
-      el.onloadedmetadata = res;
-      el.onerror = rej;
-      setTimeout(res, 4000);
-    });
-  }catch(err){
-    slot.classList.remove('on');
-    alert('视频读取失败，请换一段文件试试。');
-    return;
-  }
-
-  const w = el.videoWidth || 1920, h = el.videoHeight || 1080, dur = el.duration || 0;
-
-  if(isRear){
-    if(videoElR) videoElR.remove();
-    videoElR = el; VWr = w; VHr = h; DURr = dur; hasRear = true;
-    slot.classList.remove('on'); slot.classList.add('done');
-    $('#thumbB').src = '';
-    $('#rRes').textContent = w + ' × ' + h + ' / ' + dur.toFixed(2) + 's';
-    $('#rearInfo').style.display = 'block';
-    /* 后视角帧率只需确认可用，不再是硬门槛 */
-    const fr = await estimateFps(el);
-    FPSr = fr;
-    $('#rFps').innerHTML = fr
-      ? (fr + ' FPS ' + (fr >= 120 ? '<span style="color:#5ee9a0">✓</span>' : '<span style="color:#fbbf24">偏低，仍可用于横向指标</span>'))
-      : '<span style="color:#fbbf24">需人工确认</span>';
-    $('#vtRearSub').textContent = '已接入 · 双锚点对齐';
-    $('#vtRearSub').classList.remove('warn');
-    $('#vtabs').querySelector('[data-view="rear"]').classList.remove('lock');
-    /* 抓一帧当缩略图 */
-    const thumb = await grabFrameFrom(el, w, h, dur * 0.35);
-    if(thumb) $('#thumbB').src = thumb;
-    await sleep(60);
-    renderAll();
-    return;
-  }
-
-  videoEl = el; VW = w; VH = h; DUR = dur;
-
-  $('#vName').textContent = file.name;
-  $('#vRes').textContent = w + ' × ' + h + ' · ' + dur.toFixed(2) + 's';
-  const land = w >= h;
-  $('#vOri').innerHTML = land
-    ? '<span style="color:#5ee9a0">横屏 ✓</span>'
-    : '<span style="color:#fca5a5">竖屏 ✗</span>';
-  $('#vinfo').style.display = 'block';
-  slot.classList.remove('on'); slot.classList.add('done');
-
-  /* 分辨率判定 */
-  setChk(1, h >= 1080, 'warn', h >= 1080 ? '达标 1080p' : (h + 'p 偏低'));
-
-  /* 帧率判定 */
-  setChk(2, null, 'warn', '检测中…');
-  const est = await estimateFps(el);
-  FPS = est;
-  if(est){
-    const ok = est >= 120;
-    setChk(2, ok, ok ? 'ok' : 'bad', est + ' FPS' + (ok ? ' ✓' : ' 过低'));
-  }else{
-    setChk(2, null, 'warn', '需手动确认');
-    const t = $('#fpsTip');
-    t.style.display = 'flex';
-    t.innerHTML = '<span>⚠️</span><div>浏览器读不到本机慢动作文件的真实帧率——相册导出的慢动作常常<b style="color:#bfe0ff">时间轴被拉长 8 倍</b>（30fps 播放但每帧唯一），此时标称帧率会误报。请确认系统「设置 → 相机 → 录制慢动作视频」已选 <b style="color:#bfe0ff">1080p 240fps</b> 后继续。</div>';
-  }
-  /* 横屏判定 */
-  setChk(3, land, land ? 'ok' : 'bad', land ? '通过' : '请横屏重拍');
-
-  const thumb = await grabFrameFrom(el, w, h, dur * 0.33);
-  if(thumb) $('#thumbA').src = thumb;
-
-  $('#btnAnalyze').disabled = false;
-}
-
-function setChk(i, pass, state, txt){
-  const el = $('#c'+i), v = $('#c'+i+'v');
-  el.className = 'st ' + (state || (pass ? 'ok' : 'bad'));
-  el.textContent = pass === true ? '✓' : (pass === false ? '✕' : '!');
-  v.textContent = txt;
-  if(pass === true){ el.className = 'st ok'; el.textContent = '✓'; }
-  else if(pass === false){ el.className = 'st bad'; el.textContent = '✕'; }
-  else { el.className = 'st warn'; el.textContent = '!'; }
-}
-
-/* ---------- 帧率实测 ---------- */
-function estimateFps(video){
-  return new Promise(resolve => {
-    if(typeof video.requestVideoFrameCallback !== 'function') return resolve(null);
-    let frames = 0, t0 = null, lastT = 0, settled = false;
-    const finish = v => {
-      if(settled) return; settled = true;
-      try{ video.pause(); video.currentTime = 0; }catch(e){}
-      resolve(v);
-    };
-    const onFrame = (now, meta) => {
-      if(settled) return;
-      if(t0 === null){ t0 = meta.mediaTime; frames = 0; }
-      frames++; lastT = meta.mediaTime;
-      const span = lastT - t0;
-      if(frames > 6 && span >= 0.8){ finish(Math.round((frames - 1) / span)); return; }
-      if(frames > 500){ finish(null); return; }
-      video.requestVideoFrameCallback(onFrame);
-    };
-    setTimeout(() => finish(null), 2600);
-    try{
-      video.currentTime = 0;
-      const p = video.play();
-      if(p && p.then){ p.then(() => video.requestVideoFrameCallback(onFrame)).catch(() => finish(null)); }
-      else { video.requestVideoFrameCallback(onFrame); }
-    }catch(e){ finish(null); }
+function buildIframe(mode){
+  if(frames[mode]) return frames[mode];
+  const f = document.createElement('iframe');
+  f.className = 'frame';
+  f.title = META[mode].label;
+  f.setAttribute('allow', 'fullscreen; autoplay; encrypted-media');
+  f.addEventListener('load', function(){
+    ready[mode] = true;
+    if(mode === cur) hideLoad();
   });
+  f.src = META[mode].file;
+  stage.appendChild(f);
+  frames[mode] = f;
+  return f;
 }
 
-/* ---------- 分析流程 ---------- */
-$('#btnAnalyze').onclick = async () => {
-  go('s-an');
-  const steps = $$('#steps .step');
-  const titles = [
-    ['正在解码视频帧…','提取 240fps 原始帧序列'],
-    ['正在估计人体姿态…','逐帧推断 33 个关键点坐标'],
-    ['正在定位关键帧…','手腕速度峰值 / 踝关节落地检测'],
-    hasRear
-      ? ['正在对齐双视角…','抬腿启动 + 出手帧 双锚点映射']
-      : ['正在计算生物力学指标…','关节角度 · 旋转扭矩 · 时序相位'],
-    ['正在生成诊断报告…','匹配青少年防伤知识库']
-  ];
-  for(let i = 0; i < steps.length; i++){
-    steps.forEach((s,k) => s.className = 'step' + (k < i ? ' done' : k === i ? ' act' : ''));
-    $('#anTtl').textContent = titles[i][0];
-    $('#anSub').textContent = titles[i][1];
-    $('#anBar').style.width = ((i+1)/steps.length*100) + '%';
-    await sleep(i === 1 ? 900 : 520);
-  }
-  frames = {}; framesRear = {}; rearAnchors = null; view = 'side';
-  await extractAll();
-  active = 1;
-  renderAll();
-  go('s-res');
-};
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-/* ---------- 真实关键帧截取 ---------- */
-function grabFrameFrom(el, w, h, t, dur){
-  return new Promise(resolve => {
-    if(!el){ resolve(null); return; }
-    const total = dur === undefined ? (el === videoEl ? DUR : DURr) : dur;
-    const done = () => {
-      el.onseeked = null;
-      try{
-        const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(el, 0, 0, w, h);
-        resolve(c.toDataURL('image/jpeg', 0.86));
-      }catch(e){ resolve(null); }
-    };
-    el.onseeked = done;
-    try{ el.currentTime = Math.max(0, Math.min(t, Math.max(0, total - 0.03))); }catch(e){ done(); }
-    setTimeout(() => { if(el.onseeked === done) done(); }, 1600);
-  });
+let loadTimer = null;
+function showLoad(){
+  if(loadTimer) clearTimeout(loadTimer);
+  loadEl.classList.remove('off');
 }
-function grabFrame(t){
-  return grabFrameFrom(videoEl, VW, VH, t, DUR);
+function hideLoad(){
+  loadTimer = setTimeout(function(){ loadEl.classList.add('off'); }, 120);
 }
 
-async function extractAll(){
-  for(const cp of CPS){
-    const d = await grabFrame((DUR || 1) * cp.tPct);
-    if(d) frames[cp.id] = d;
-    if(hasRear){
-      /* 双视角对齐：双锚点仿射映射，而非各自按百分比取帧 */
-      const t = alignRearTime(cp);
-      const r = await grabFrameFrom(videoElR, VWr, VHr, t, DURr);
-      if(r) framesRear[cp.id] = r;
-    }
-    await sleep(40);
-  }
-}
+function show(mode, writeHash){
+  if(!META[mode]) mode = 'pitch';
+  if(cur === mode) return;
 
-/* 双视角时间对齐：
-   两机位时长不同、开机时刻也不同，所以「按百分比取帧」和「单锚点对齐」都会错位。
-   单靠出手帧只能对齐那一刻，解不出时长差与起始偏移。
-   正确做法——双锚点仿射映射：
-     A1 = 抬腿启动帧（后脚踝开始位移）   A2 = 出手帧（手腕速度峰值）
-     B1、B2 = 后视角时间轴上的同一两个事件
-     映射：t_B = B1 + (t_A - A1) × (B2 - B1) / (A2 - A1)
-   两个锚点把「时长缩放」和「起始偏移」同时解掉了。 */
-const A1_PCT = 0.03;      // 侧视角：抬腿启动相位
-const A2_PCT = 0.66;      // 侧视角：出手帧相位（CP5 所在位置）
-let rearAnchors = null;
+  buildIframe(mode);
 
-function detectRearAnchors(el, dur){
-  /* 生产版：逐帧解算后脚踝关节位移速度与手腕速度，
-     取「踝开始位移」与「手腕速度峰值」两帧作为锚点。
-     原型：给出估计值，并允许用户用「替换该检查点画面」手动校正。 */
-  return { b1: 0.06, b2: 0.62 };
-}
-
-function alignRearTime(cp){
-  if(!rearAnchors) rearAnchors = detectRearAnchors(videoElR, DURr);
-  const { b1, b2 } = rearAnchors;
-  const k = (b2 - b1) / (A2_PCT - A1_PCT);      // 时间尺度比
-  const pct = b1 + (cp.tPct - A1_PCT) * k;
-  return Math.max(0, Math.min(1, pct)) * (DURr || 1);
-}
-
-/* ---------- 标注渲染（SVG） ---------- */
-const rad = d => d * Math.PI / 180;
-
-function buildOverlay(cp){
-  const isRear = view === 'rear' && !!cp.rear;
-  const w = isRear ? (VWr || 1920) : (VW || 1920);
-  const h = isRear ? (VHr || 1080) : (VH || 1080);
-  const H = 1000 * h / w;
-  const svg = $('#ov');
-  svg.setAttribute('viewBox', '0 0 1000 ' + H.toFixed(2));
-  svg.setAttribute('preserveAspectRatio', 'none');
-  const X = x => (x * 1000).toFixed(1);
-  const Y = y => (y * H).toFixed(1);
-  const a = (isRear ? cp.rear.anno : cp.anno) || {};
-  let out = '';
-
-  out += '<defs>';
-  out += '<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">'
-       + '<path d="M0 0 L10 5 L0 10 z" fill="#a855f7"/></marker>';
-  out += '<marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">'
-       + '<path d="M0 0 L10 5 L0 10 z" fill="#22d3ee"/></marker>';
-  out += '</defs>';
-
-  /* 地面线 */
-  out += '<line x1="0" y1="' + Y(0.90) + '" x2="1000" y2="' + Y(0.90) + '" stroke="#3b4f70" stroke-width="2.4"/>';
-
-  /* 参考辅助线 */
-  (a.guides || []).forEach(g => {
-    out += '<line x1="' + X(g.x1) + '" y1="' + Y(g.y1) + '" x2="' + X(g.x2) + '" y2="' + Y(g.y2)
-        +  '" stroke="' + g.color + '" stroke-width="1.9" stroke-dasharray="9 7" opacity=".85"/>';
-    if(g.label){
-      const mx = (g.x1 + g.x2) / 2, my = (g.y1 + g.y2) / 2;
-      out += '<text x="' + X(mx) + '" y="' + (Y(my) - 8) + '" fill="' + g.color + '" font-size="19" font-family="sans-serif" font-weight="700" text-anchor="middle" opacity=".95">' + g.label + '</text>';
-    }
+  tabs.forEach(function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
+  Object.keys(frames).forEach(function(m){
+    frames[m].classList.toggle('on', m === mode);
   });
 
-  /* 骨骼 */
-  (a.bones || []).forEach(b => {
-    const pts = b.pts.map(p => X(p[0]) + ',' + Y(p[1])).join(' ');
-    out += '<polyline points="' + pts + '" fill="none" stroke="rgba(3,8,18,.55)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>';
-    out += '<polyline points="' + pts + '" fill="none" stroke="' + b.color + '" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>';
-  });
-  /* 关节点 */
-  (a.bones || []).forEach(b => b.pts.forEach(p => {
-    out += '<circle cx="' + X(p[0]) + '" cy="' + Y(p[1]) + '" r="5.6" fill="#ffffff" stroke="rgba(3,8,18,.5)" stroke-width="1.6"/>';
-  }));
+  cur = mode;
 
-  /* 角度弧 */
-  (a.arcs || []).forEach(ar => {
-    const V = [ar.v[0]*1000, ar.v[1]*H];
-    const A = [ar.p1[0]*1000, ar.p1[1]*H];
-    const B = [ar.p2[0]*1000, ar.p2[1]*H];
-    let a1 = Math.atan2(A[1]-V[1], A[0]-V[0]);
-    let a2 = Math.atan2(B[1]-V[1], B[0]-V[0]);
-    let d = a2 - a1;
-    while(d > Math.PI) d -= 2*Math.PI;
-    while(d < -Math.PI) d += 2*Math.PI;
-    const r = ar.r * 1000;
-    const s = [V[0]+r*Math.cos(a1), V[1]+r*Math.sin(a1)];
-    const e = [V[0]+r*Math.cos(a1+d), V[1]+r*Math.sin(a1+d)];
-    const large = Math.abs(d) > Math.PI ? 1 : 0;
-    const sweep = d > 0 ? 1 : 0;
-    /* 两条测量边 */
-    out += '<line x1="' + V[0].toFixed(1) + '" y1="' + V[1].toFixed(1) + '" x2="' + (V[0]+r*1.5*Math.cos(a1)).toFixed(1) + '" y2="' + (V[1]+r*1.5*Math.sin(a1)).toFixed(1) + '" stroke="' + ar.color + '" stroke-width="1.6" opacity=".55"/>';
-    out += '<line x1="' + V[0].toFixed(1) + '" y1="' + V[1].toFixed(1) + '" x2="' + (V[0]+r*1.5*Math.cos(a1+d)).toFixed(1) + '" y2="' + (V[1]+r*1.5*Math.sin(a1+d)).toFixed(1) + '" stroke="' + ar.color + '" stroke-width="1.6" opacity=".55"/>';
-    /* 弧线 */
-    out += '<path d="M ' + s[0].toFixed(1) + ' ' + s[1].toFixed(1) + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' ' + sweep + ' ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1) + '" fill="none" stroke="' + ar.color + '" stroke-width="3.6" stroke-linecap="round"/>';
-    /* 标签 */
-    const mid = a1 + d/2, lr = r * 1.75;
-    const lx = V[0] + lr*Math.cos(mid), ly = V[1] + lr*Math.sin(mid);
-    const tw = ar.label.length * 11 + 18;
-    out += '<rect x="' + (lx - tw/2).toFixed(1) + '" y="' + (ly - 17).toFixed(1) + '" width="' + tw + '" height="24" rx="6" fill="rgba(4,8,18,.8)" stroke="' + ar.color + '" stroke-width="1.3"/>';
-    out += '<text x="' + lx.toFixed(1) + '" y="' + (ly).toFixed(1) + '" fill="' + ar.color + '" font-size="19" font-weight="800" font-family="sans-serif" text-anchor="middle">' + ar.label + '</text>';
-    out += '<circle cx="' + V[0].toFixed(1) + '" cy="' + V[1].toFixed(1) + '" r="4.4" fill="' + ar.color + '"/>';
-  });
+  if(ready[mode]) hideLoad(); else showLoad();
 
-  /* 旋转箭头 */
-  (a.rot || []).forEach(rt => {
-    const C = [rt.c[0]*1000, rt.c[1]*H];
-    const r = rt.r * 1000;
-    const s = rad(rt.a0), e2 = rad(rt.a1);
-    const sp = [C[0]+r*Math.cos(s), C[1]+r*Math.sin(s)];
-    const ep = [C[0]+r*Math.cos(e2), C[1]+r*Math.sin(e2)];
-    const large = Math.abs(rt.a1 - rt.a0) > 180 ? 1 : 0;
-    out += '<path d="M ' + sp[0].toFixed(1) + ' ' + sp[1].toFixed(1) + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + ep[0].toFixed(1) + ' ' + ep[1].toFixed(1) + '" fill="none" stroke="' + rt.color + '" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="11 8" marker-end="url(#ah)"/>';
-    const mx = C[0] + r*1.32*Math.cos(rad((rt.a0 + rt.a1)/2));
-    const my = C[1] + r*1.32*Math.sin(rad((rt.a0 + rt.a1)/2));
-    out += '<text x="' + mx.toFixed(1) + '" y="' + my.toFixed(1) + '" fill="' + rt.color + '" font-size="19" font-weight="800" font-family="sans-serif" text-anchor="middle">↻ ' + rt.label + '</text>';
-  });
+  if(writeHash !== false){
+    try{ history.replaceState(null, '', '#' + mode); }
+    catch(e){ location.hash = mode; }
+  }
 
-  /* 标记点 */
-  (a.marks || []).forEach(m => {
-    out += '<circle cx="' + X(m.x) + '" cy="' + Y(m.y) + '" r="7.5" fill="none" stroke="' + m.color + '" stroke-width="3"/>';
-    out += '<circle cx="' + X(m.x) + '" cy="' + Y(m.y) + '" r="2.6" fill="' + m.color + '"/>';
-    out += '<text x="' + X(m.x) + '" y="' + (Y(m.y) - 15) + '" fill="' + m.color + '" font-size="18" font-weight="700" font-family="sans-serif" text-anchor="middle">' + m.label + '</text>';
-  });
-
-  svg.innerHTML = out;
+  if(hintEl && mode === 'hit') hintEl.classList.add('off');
 }
 
-/* ---------- 结果页渲染 ---------- */
-function renderAll(){
-  const cp = CPS.find(c => c.id === active) || CPS[0];
-  const rear = (view === 'rear') && !!cp.rear;
-  const box = rear ? cp.rear : cp;
-  const srcMap = rear ? framesRear : frames;
-
-  /* 画面 */
-  const cur = srcMap[cp.id] || srcMap[CPS[0].id];
-  if(cur) $('#frameImg').src = cur; else $('#frameImg').removeAttribute('src');
-  $('#stage').style.aspectRatio = rear ? (VWr + ' / ' + VHr) : (VW + ' / ' + VH);
-  buildOverlay(cp);
-
-  /* 视角切换条 */
-  const tabS = $('#vtabs').querySelector('[data-view="side"]');
-  const tabR = $('#vtabs').querySelector('[data-view="rear"]');
-  tabS.classList.toggle('on', !rear);
-  tabR.classList.toggle('on', rear);
-  tabR.classList.toggle('lock', !hasRearData());
-
-  /* 标签 / 警讯 */
-  $('#cpCode').textContent = cp.code;
-  $('#cpName').textContent = rear ? (cp.name + ' · 后视角') : cp.name;
-  if(box.alert){
-    $('#cpAlert').classList.add('on');
-    $('#cpAlertTxt').textContent = box.alert;
-  }else{
-    $('#cpAlert').classList.remove('on');
-  }
-  $('#stageMeta').textContent = rear
-    ? '后方视角 · 双锚点对齐 · 横向指标'
-    : ('1080p @240FPS · 开放侧 90° 机位');
-
-  /* 缩略图轨道 */
-  const tw = $('#thumbs');
-  tw.innerHTML = '';
-  CPS.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'th' + (c.id === active ? ' on' : '');
-    const dotColor = c.deduction > 0 ? 'var(--amber)' : 'var(--green)';
-    const img = srcMap[c.id]
-      ? '<img src="' + srcMap[c.id] + '">'
-      : (srcMap[CPS[0].id] ? '<img src="' + srcMap[CPS[0].id] + '">' : '');
-    d.innerHTML =
-      '<div class="im">' + img +
-      '<span class="st" style="background:' + dotColor + '"></span></div>' +
-      '<div class="lb">' + c.code + '<br>' + c.name.split('（')[0].split(' /')[0] + '</div>';
-    d.onclick = () => { active = c.id; renderAll(); };
-    tw.appendChild(d);
-  });
-
-  /* 帧定位 */
-  const curPct = rear ? (rearPct(cp)) : cp.tPct;
-  $('#scrub').value = Math.round(curPct * 100);
-  $('#scrubT').textContent = ((rear ? (DURr || 1) : (DUR || 1)) * curPct).toFixed(2) + 's';
-
-  /* 指标 */
-  $('#dtTitle').textContent = cp.code + ' 诊断明细' + (rear ? ' · 后方视角' : '');
-  const badge = $('#dtBadge');
-  if(rear){
-    badge.className = 'pill p-info';
-    badge.textContent = '横向指标';
-  }else if(cp.deduction > 0){
-    badge.className = 'pill p-warn';
-    badge.textContent = '扣除 ' + cp.deduction + ' 分';
-  }else{
-    badge.className = 'pill p-ok';
-    badge.textContent = '满分';
-  }
-  $('#m1l').textContent = box.m1.l; $('#m1v').textContent = box.m1.v; $('#m1g').textContent = box.m1.g;
-  $('#m1v').style.color = box.m1.c;
-  $('#m2l').textContent = box.m2.l; $('#m2v').textContent = box.m2.v; $('#m2g').textContent = box.m2.g;
-  $('#m2v').style.color = box.m2.c;
-  $('#fbDesc').innerHTML = box.desc;
-  $('#fbAdvice').innerHTML = box.advice;
-  $('#confTxt').textContent = '骨骼识别置信度 ' + box.conf + '%';
-
-  /* 后视角提示条 */
-  const hint = $('#rearHint');
-  if(rear){
-    hint.style.display = 'none';
-  }else if(hasRearData() && cp.rear){
-    hint.style.display = 'flex';
-    $('#rearHintTxt').innerHTML = '已接入<b style="color:#bfe0ff">后方视角</b>。切到后视角可查看本检查点的横向指标——这些是侧视角在几何上测不到的量。';
-  }else{
-    hint.style.display = 'flex';
-    $('#rearHintTxt').innerHTML = '<b style="color:#bfe0ff">未上传后方视角</b>：跨步横向偏离、前膝扣角、躯干侧倾共 <b>3 项横向指标</b>本次未测量。下次加一个后方机位即可解锁，不影响本次 6 项动力链结论。';
-  }
-}
-function rearPct(cp){
-  if(DURr <= 0) return 0.5;
-  return Math.max(0, Math.min(1, alignRearTime(cp) / DURr));
-}
-
-/* 视角切换 */
-$('#vtabs').querySelectorAll('.vt').forEach(t => {
-  t.onclick = () => {
-    const v = t.dataset.view;
-    if(v === 'rear' && !hasRearData()){
-      alert('本次未上传后方视角。\n\n后方视角用于测量跨步横向偏离、前膝扣角、躯干侧倾这 3 项侧视角测不到的量。\n下次拍摄时加一个后方机位即可解锁。');
-      return;
-    }
-    view = v;
-    renderAll();
-  };
+tabs.forEach(function(b){
+  b.addEventListener('click', function(){ show(b.dataset.mode, true); });
 });
-$('#rearHint').onclick = () => {
-  if(!hasRearData()) return;
-  view = 'rear';
-  renderAll();
-};
 
-/* 拖动定位 + 替换关键帧（按当前视角操作） */
-$('#scrub').oninput = e => {
-  const dur = (view === 'rear') ? (DURr || 1) : (DUR || 1);
-  $('#scrubT').textContent = (dur * (e.target.value / 100)).toFixed(2) + 's';
-};
-$('#scrub').onchange = async e => {
-  const rear = (view === 'rear');
-  const dur = rear ? (DURr || 1) : (DUR || 1);
-  const pct = e.target.value / 100;
-  const d = rear
-    ? await grabFrameFrom(videoElR, VWr, VHr, dur * pct, DURr)
-    : await grabFrame(dur * pct);
-  if(d){
-    if(rear) framesRear[active] = d; else frames[active] = d;
-    renderAll();
-  }
-};
-$('#btnSetFrame').onclick = async () => {
-  const rear = (view === 'rear');
-  const dur = rear ? (DURr || 1) : (DUR || 1);
-  const pct = $('#scrub').value / 100;
-  const d = rear
-    ? await grabFrameFrom(videoElR, VWr, VHr, dur * pct, DURr)
-    : await grabFrame(dur * pct);
-  if(d){
-    if(rear) framesRear[active] = d; else frames[active] = d;
-    renderAll();
-  }
-};
+/* ---------- 启动：按 URL hash 决定初始模式（便于直接分享某一种模式） ---------- */
+(function init(){
+  const h = (location.hash || '').replace(/^#/, '').toLowerCase();
+  show(META[h] ? h : 'pitch', false);
+  /* 首次进入时把 hash 补上，方便复制当前模式链接 */
+  try{ history.replaceState(null, '', '#' + cur); }catch(e){}
+})();
 
-/* ---------- 报告 ---------- */
-$('#btnReport').onclick = () => { buildReport(); go('s-rep'); };
+window.addEventListener('hashchange', function(){
+  const m = (location.hash || '').replace(/^#/, '').toLowerCase();
+  if(META[m]) show(m, false);
+});
 
-function buildReport(){
-  const total = CPS.reduce((s,c) => s + c.deduction, 0);
-  const score = Math.max(0, 100 - total);
-  const grade = score >= 90 ? 'A' : score >= 80 ? 'B+' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D';
-  const color = score >= 85 ? '#22c55e' : score >= 70 ? '#3b82f6' : '#f59e0b';
-
-  $('#repScore').textContent = score;
-  $('#repScore').style.color = color;
-  $('#repGrade').textContent = grade;
-  const risky = CPS.filter(c => c.deduction > 0).length;
-  $('#repSummary').innerHTML = risky === 0
-    ? '六项动力链检查点全部达标。<b style="color:#5ee9a0">动力链传导完整</b>，未见明显受伤风险信号。'
-    : '发现 <b style="color:#fbbf24">' + risky + ' 处</b>潜在受伤风险提示，累计扣分 ' + total + ' 分。优先解决时序类问题，再谈球速。';
-
-  const arc = $('#ringArc');
-  arc.setAttribute('stroke', color);
-  arc.setAttribute('stroke-dashoffset', (257.6 * (1 - score/100)).toFixed(1));
-
-  const now = new Date();
-  $('#repDate').textContent = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0')
-    + '-' + String(now.getDate()).padStart(2,'0') + ' · 单次采样';
-
-  /* 六项清单 */
-  const list = $('#repList');
-  list.innerHTML = '';
-  CPS.forEach(c => {
-    const ok = c.deduction === 0;
-    const row = document.createElement('div');
-    row.className = 'rp';
-    row.innerHTML =
-      '<div class="dot" style="background:' + (ok ? 'rgba(34,197,94,.16)' : 'rgba(245,158,11,.16)')
-      + ';color:' + (ok ? '#5ee9a0' : '#fbbf24') + ';border:1px solid ' + (ok ? 'rgba(34,197,94,.45)' : 'rgba(245,158,11,.45)') + '">'
-      + (ok ? '✓' : '!') + '</div>' +
-      '<div class="nm">' + c.code + ' · ' + c.name +
-      '<small>' + c.m1.l + '：' + c.m1.v + ' ｜ ' + c.m2.l + '：' + c.m2.v + '</small></div>' +
-      '<div style="font-size:11px;font-weight:800;color:' + (ok ? '#5ee9a0' : '#fbbf24') + '">'
-      + (ok ? '满分' : '-' + c.deduction) + '</div>';
-    list.appendChild(row);
-  });
-
-  /* 优先改进 */
-  const prio = $('#repPrio');
-  prio.innerHTML = '';
-  const issues = CPS.filter(c => c.deduction > 0).sort((a,b) => b.deduction - a.deduction);
-  if(issues.length === 0){
-    prio.innerHTML = '<div class="card" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05)">'
-      + '<div style="font-size:12px;font-weight:700;color:#8ff0bb;margin-bottom:5px">✓ 暂无需优先修正的项目</div>'
-      + '<div class="hint">继续保持每周训练节奏，每 2 周复查一次，重点观察 MER 外旋角与肩髋分离角的趋势变化。</div></div>';
-  }else{
-    issues.forEach((c,i) => {
-      const d = document.createElement('div');
-      d.className = 'card';
-      d.style.marginBottom = '9px';
-      d.style.borderColor = 'rgba(245,158,11,.28)';
-      d.innerHTML =
-        '<div class="row" style="margin-bottom:6px">' +
-          '<span class="pill p-warn">优先级 ' + (i+1) + '</span>' +
-          '<span style="font-size:12px;font-weight:700;color:#e9f0ff">' + c.code + ' · ' + c.name + '</span>' +
-        '</div>' +
-        '<div class="hint" style="color:#c3d5ef">' + c.advice + '</div>';
-      prio.appendChild(d);
-    });
-  }
-
-  /* --- 横向指标（后视角） --- */
-  const lat = $('#repLateral');
-  if(hasRearData()){
-    const items = [
-      {v:'+6 cm', n:'跨步横向偏离', t:'前脚落点相对身体中线偏移 +6cm，在 ±10cm 允许范围内。偏离越大，球速损失与肩部代偿越明显。', c:'var(--green)'},
-      {v:'11°', n:'前膝扣角（Knee Valgus）', t:'接近 15° 临界值。这是青少年膝伤与投球失准的核心预警指标，需持续监控，连续两次超阈即应转介队医。', c:'var(--amber)'},
-      {v:'12°', n:'躯干侧倾角', t:'在标准范围内，未见向一垒侧过度倾倒。过度侧倾意味着肩部要额外承担减速负荷。', c:'var(--green)'}
-    ];
-    lat.innerHTML = items.map(i =>
-      '<div class="mx"><div class="mxv" style="color:' + i.c + '">' + i.v + '</div>'
-      + '<div class="mxt"><b>' + i.n + '</b>' + i.t + '</div></div>'
-    ).join('')
-    + '<div class="note"><span>🔗</span><div>对齐锚点：<b style="color:#bfe0ff">抬腿启动帧 + 出手帧</b>。两路视频在各自时间轴上独立定位这两个事件，做仿射映射——所以两段视频时长不同、开机时刻不同都不影响，也不需要时间码同步。</div></div>';
-  }else{
-    lat.innerHTML = '<div class="card" style="border-style:dashed">'
-      + '<div class="row" style="margin-bottom:6px"><span class="pill p-gray">未测量</span>'
-      + '<span style="font-size:12px;font-weight:700;color:#cfe0fb">本次未上传后方视角</span></div>'
-      + '<div class="hint">以下 3 项在侧视角下<b class="k">几何上无法测量</b>——不是精度不够，是信息本身不在画面里（横向分量落在镜头轴线上）：<br>'
-      + '&nbsp;&nbsp;· 跨步横向偏离<br>'
-      + '&nbsp;&nbsp;· 前膝扣角（Knee Valgus）<br>'
-      + '&nbsp;&nbsp;· 躯干侧倾角<br><br>'
-      + '<b class="k">下次拍摄加一个后方机位即可解锁</b>，不影响本次 6 项动力链结论的完整性。</div></div>';
-  }
-
-  /* --- 设备数据融合（可选） --- */
-  const dev = $('#repDevice');
-  if(devData){
-    const tr = devData.speedTrend;
-    const arrow = tr === 'up' ? '↑' : tr === 'down' ? '↓' : '→';
-    const cls = tr === 'up' ? 'up' : tr === 'down' ? 'dn' : '';
-    dev.innerHTML =
-      '<div class="dev"><div class="dl" style="background:rgba(59,130,246,.14);color:#7dd3fc;border:1px solid rgba(59,130,246,.35)">RAPS<br>ODO</div>'
-      + '<div style="flex:1;min-width:0"><div class="dn">' + devData.source + '</div>'
-      + '<div class="ds">' + devData.date + '</div></div>'
-      + '<span class="pill p-ok">已融合</span></div>'
-      + '<div class="mgrid" style="margin-bottom:10px">'
-      + mcard('球速', devData.speed, 'km/h', arrow + ' ' + devData.speedDelta, cls)
-      + mcard('旋转率', devData.spin, 'rpm', '旋转轴 ' + devData.axis, '')
-      + mcard('出手点高度', devData.release, 'm', '关联躯干前倾角', '')
-      + mcard('臂速', devData.armSpeed, 'mph', '关联 MER 外旋角', '')
-      + '</div>'
-      + jointVerdict(tr)
-      + '<button class="btn ghost" id="btnClearDev" style="padding:10px;font-size:12px;margin-top:10px">清除设备数据</button>';
-    const cb = $('#btnClearDev');
-    if(cb) cb.onclick = () => { devData = null; buildReport(); };
-  }else{
-    dev.innerHTML =
-      '<div class="card" style="border-style:dashed">'
-      + '<div class="hint" style="margin-bottom:11px">可选接入测速设备数据，与动力链做<b class="k">联合诊断</b>。只凭动作分析分不清「技术问题」还是「体能问题」，两者结合才能给出正确处置——这是本产品最有价值的一层判断。</div>'
-      + '<button class="btn ghost" id="btnDemo" style="padding:11px;font-size:12px;margin-bottom:8px">载入示例数据（Rapsodo PITCHING 2.0）</button>'
-      + '<button class="btn ghost" id="btnCsv" style="padding:11px;font-size:12px">导入 CSV 文件</button>'
-      + '<input type="file" id="csvFile" accept=".csv,.txt" style="display:none">'
-      + '</div>';
-    $('#btnDemo').onclick = () => { devData = DEMO_DEV; buildReport(); };
-    $('#btnCsv').onclick = () => $('#csvFile').click();
-    $('#csvFile').onchange = e => {
-      const f = e.target.files[0]; if(!f) return;
-      const rd = new FileReader();
-      rd.onload = () => { devData = parseDeviceCsv(String(rd.result), f.name); buildReport(); };
-      rd.readAsText(f);
-    };
-  }
-
-  $('#nextCam').textContent = hasRearData() ? '双视角（开放侧 90° + 后方）' : '开放侧 90°（同上次）';
+/* 桌面端首次交互后淡出底部提示 */
+if(hintEl){
+  setTimeout(function(){ hintEl.classList.add('off'); }, 6000);
+  document.addEventListener('click', function(){ hintEl.classList.add('off'); }, { once:true });
 }
-
-/* ---------- 设备数据融合辅助 ---------- */
-const DEMO_DEV = {
-  source:'Rapsodo PITCHING 2.0',
-  date:'2026-09-15 · 20 球样本 · 与本次视频同一次投球',
-  speed:'80.2', speedDelta:'3.1 km/h 较上次', speedTrend:'down',
-  spin:'1580', axis:'12:40',
-  release:'1.72', armSpeed:'22.4'
-};
-
-function mcard(l, v, u, d, cls){
-  return '<div class="mg"><div class="l">' + l + '</div>'
-    + '<div class="v">' + v + '<u>' + u + '</u></div>'
-    + (d ? '<div class="d ' + (cls || '') + '">' + d + '</div>' : '') + '</div>';
-}
-
-/* 联合诊断矩阵：动力链状态 × 球速趋势 */
-function jointVerdict(trend){
-  const risky = CPS.filter(c => c.deduction > 0).length;
-  const chainOK = risky === 0;
-  let cls, title, body;
-  if(chainOK && trend !== 'down'){
-    cls = 'v-g';
-    title = '✓ 状态正常 · 技术与输出同步稳定';
-    body = '动力链 6 项全部达标，球速保持稳定或上升。当前训练强度与动作模式匹配，按原计划推进即可。';
-  }else if(chainOK && trend === 'down'){
-    cls = 'v-w';
-    title = '⚠ 动作没问题，但球速在掉 —— 大概率是体能或疲劳';
-    body = '动力链完好说明动作模式没有退化，球速下降更可能来自<b>疲劳累积、力量不足或投球量过大</b>。此时<b>不要加练技术</b>，应减量恢复、补下肢与核心力量。<br>这正是只看动作分析会误判的一类情况——动作漂亮但输出衰减，说明身体在省着用。';
-  }else if(!chainOK && trend !== 'down'){
-    cls = 'v-w';
-    title = '⚠ 正在用代偿换速度 —— 风险在累积';
-    body = '存在 <b>' + risky + ' 处</b>动力链缺陷，但球速仍维持稳定，说明身体在用其他环节代偿。这类情况最容易被忽略：<b>成绩没掉，伤却在攒</b>。应优先修正动作，而不是继续加量。';
-  }else{
-    cls = 'v-b';
-    title = '🔴 双重风险 —— 立即减量 + 改动作';
-    body = '动力链有 <b>' + risky + ' 处</b>缺陷，同时球速下降。技术问题与体能问题叠加，继续投球受伤概率显著上升。<b>建议立即降低投球量至少 50%</b>，先做动作修正与恢复，2 周后复查。';
-  }
-  return '<div class="verdict ' + cls + '"><div class="vh">' + title + '</div>' + body + '</div>'
-    + '<div class="hint" style="margin-top:9px">判定逻辑：动力链状态来自本页 6 项检查点，球速趋势来自设备数据。四象限覆盖「技术好/差 × 输出稳/降」四种组合。</div>';
-}
-
-/* 宽松 CSV 解析：不绑定特定品牌格式，按数值区间提取关键量 */
-function parseDeviceCsv(txt, name){
-  const nums = (txt.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
-  const find = (lo, hi, def) => {
-    const v = nums.find(n => n > lo && n < hi);
-    return v === undefined ? def : v;
-  };
-  const lines = txt.trim().split(/\r?\n/).length;
-  return {
-    source: 'CSV 导入 · ' + name.replace(/\.[^.]+$/, ''),
-    date: new Date().toLocaleDateString('zh-CN') + ' · 解析 ' + Math.max(1, lines - 1) + ' 行数据',
-    speed: find(40, 120, 78).toFixed(1),
-    speedDelta: '无历史对比', speedTrend: 'flat',
-    spin: String(Math.round(find(800, 3500, 1500))),
-    axis: '—',
-    release: find(1.2, 2.4, 1.7).toFixed(2),
-    armSpeed: find(15, 40, 20).toFixed(1)
-  };
-}
-
-$('#btnAgain').onclick = () => {
-  /* 主视角 */
-  frames = {}; active = 1; FPS = null; view = 'side';
-  if(videoEl){ videoEl.remove(); videoEl = null; }
-  /* 后视角 */
-  framesRear = {}; FPSr = null; hasRear = false; rearAnchors = null;
-  if(videoElR){ videoElR.remove(); videoElR = null; }
-  /* 设备数据 */
-  devData = null;
-  /* UI 复位 */
-  $('#vinfo').style.display = 'none';
-  $('#fpsTip').style.display = 'none';
-  $('#rearInfo').style.display = 'none';
-  $('#btnAnalyze').disabled = true;
-  $('#slotA').classList.remove('done','on');
-  $('#slotB').classList.remove('done','on');
-  $('#thumbA').removeAttribute('src');
-  $('#thumbB').removeAttribute('src');
-  ['c1','c2','c3'].forEach(id => { $('#'+id).className = 'st warn'; $('#'+id).textContent = '!'; });
-  $('#c1v').textContent = '检测中'; $('#c2v').textContent = '检测中'; $('#c3v').textContent = '检测中';
-  $('#vName').textContent = '-'; $('#vRes').textContent = '-'; $('#vOri').textContent = '-';
-  $('#fileA').value = ''; $('#fileB').value = '';
-  $('#vtRearSub').textContent = '未上传 · 3 项未测量';
-  $('#vtRearSub').classList.add('warn');
-  $('#vtabs').querySelector('[data-view="rear"]').classList.add('lock');
-  go('s-up');
-};
-
-refreshGuide();
 </script>
 </body>
 </html>
